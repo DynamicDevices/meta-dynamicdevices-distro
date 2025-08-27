@@ -6,7 +6,7 @@
 [![License: Commercial](https://img.shields.io/badge/License-Commercial-green.svg)](mailto:licensing@dynamicdevices.co.uk)
 [![Yocto Compatible](https://img.shields.io/badge/Yocto-scarthgap%20|%20kirkstone-orange.svg)](https://www.yoctoproject.org/)
 [![YP Compliance Ready](https://img.shields.io/badge/YP%20Compliance-Distro%20Ready-blue)](https://docs.yoctoproject.org/test-manual/yocto-project-compatible.html)
-[![Layer Validation](https://github.com/DynamicDevices/meta-dynamicdevices/actions/workflows/yocto-layer-validation.yml/badge.svg)](https://github.com/DynamicDevices/meta-dynamicdevices/actions/workflows/yocto-layer-validation.yml)
+[![Distro Layer Validation](https://github.com/DynamicDevices/meta-dynamicdevices-distro/actions/workflows/distro-layer-validation.yml/badge.svg)](https://github.com/DynamicDevices/meta-dynamicdevices-distro/actions/workflows/distro-layer-validation.yml)
 
 Distribution layer for Dynamic Devices Edge Computing platforms, providing custom Linux microPlatform (LmP) distributions with specialized features and configurations.
 
