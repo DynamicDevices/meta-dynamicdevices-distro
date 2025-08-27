@@ -117,6 +117,7 @@ jobs:
         
         # Create minimal meta-lmp-base if meta-lmp clone failed
         if [ ! -d "build/layers/meta-lmp" ]; then
+          echo "Creating fallback meta-lmp-base layer..."
           mkdir -p build/layers/meta-lmp-base/conf
           cat > build/layers/meta-lmp-base/conf/layer.conf << 'EOF'
         BBPATH .= ":${LAYERDIR}"
@@ -138,6 +139,8 @@ jobs:
         DISTRO_FEATURES:remove = "sysvinit"
         VIRTUAL-RUNTIME_init_manager = "systemd"
         EOF
+        else
+          echo "Using real meta-lmp layer"
         fi
 
     - name: Validate Distro Layer Structure
@@ -267,6 +270,14 @@ jobs:
         DL_DIR ?= "\${TOPDIR}/downloads"
         SSTATE_DIR ?= "\${TOPDIR}/sstate-cache"
         EOF
+        
+        # Ensure lmp.conf is available in the global distro path for our distro configs
+        mkdir -p build/conf/distro
+        if [ -f "build/layers/meta-lmp/meta-lmp-base/conf/distro/lmp.conf" ]; then
+          cp build/layers/meta-lmp/meta-lmp-base/conf/distro/lmp.conf build/conf/distro/
+        elif [ -f "build/layers/meta-lmp-base/conf/distro/lmp.conf" ]; then
+          cp build/layers/meta-lmp-base/conf/distro/lmp.conf build/conf/distro/
+        fi
         
         # Test BitBake environment first
         cd build
