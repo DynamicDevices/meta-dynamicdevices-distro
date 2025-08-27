@@ -273,9 +273,9 @@ jobs:
         # Run the layer check
         echo "Running yocto-check-layer..."
         python3 ../build/layers/openembedded-core/scripts/yocto-check-layer \
-          --layer .. \
-          --output-log ../distro-layer-check-${{ matrix.yocto_branch }}.log \
-          || echo "yocto-check-layer completed with issues"
+          .. \
+          --no-auto-dependency \
+          --output-log ../distro-layer-check-${{ matrix.yocto_branch }}.log
 
     - name: Analyze Distro Layer Check Results
       run: |
