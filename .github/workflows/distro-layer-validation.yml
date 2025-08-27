@@ -222,26 +222,27 @@ jobs:
         fi
         cd ..
         
-        # Create bblayers.conf
+        # Create bblayers.conf with correct absolute paths
+        WORKSPACE_ROOT="$(pwd)"
         cat > build/conf/bblayers.conf << EOF
         LCONF_VERSION = "7"
         BBPATH = "\${TOPDIR}"
         BBFILES ?= ""
         BBLAYERS ?= " \\
-          \${TOPDIR}/../build/layers/openembedded-core/meta \\
-          \${TOPDIR}/../build/layers/meta-openembedded/meta-oe \\
+          $WORKSPACE_ROOT/build/layers/openembedded-core/meta \\
+          $WORKSPACE_ROOT/build/layers/meta-openembedded/meta-oe \\
         EOF
         
         # Add meta-lmp layers if available
-        if [ -d "../build/layers/meta-lmp" ]; then
-          echo "  \${TOPDIR}/../build/layers/meta-lmp/meta-lmp-base \\" >> build/conf/bblayers.conf
+        if [ -d "build/layers/meta-lmp" ]; then
+          echo "  $WORKSPACE_ROOT/build/layers/meta-lmp/meta-lmp-base \\" >> build/conf/bblayers.conf
         else
-          echo "  \${TOPDIR}/../build/layers/meta-lmp-base \\" >> build/conf/bblayers.conf
+          echo "  $WORKSPACE_ROOT/build/layers/meta-lmp-base \\" >> build/conf/bblayers.conf
         fi
         
         # Add the distro layer being tested
         cat >> build/conf/bblayers.conf << EOF
-          \${TOPDIR}/.. \\
+          $WORKSPACE_ROOT \\
         "
         EOF
         
@@ -282,11 +283,34 @@ jobs:
         
         # Run the layer check
         echo "Running yocto-check-layer..."
-        # Run yocto-check-layer with proper environment setup
+        # Debug: Show current directory and layer structure
+        echo "Current directory: $(pwd)"
+        echo "Available layers:"
+        ls -la build/layers/ || echo "No build/layers directory found"
+        if [ -d "build/layers/meta-lmp" ]; then
+          echo "meta-lmp structure:"
+          ls -la build/layers/meta-lmp/
+        fi
+        if [ -d "build/layers/meta-lmp-base" ]; then
+          echo "meta-lmp-base structure:"
+          ls -la build/layers/meta-lmp-base/
+        fi
+        
+        # Run yocto-check-layer with explicit dependencies
         # The layer being tested is the current directory (.)
+        DEPENDENCY_ARGS=""
+        if [ -d "build/layers/meta-lmp" ]; then
+          DEPENDENCY_ARGS="--dependency build/layers/meta-lmp/meta-lmp-base"
+        else
+          DEPENDENCY_ARGS="--dependency build/layers/meta-lmp-base"
+        fi
+        
+        echo "Running with dependencies: $DEPENDENCY_ARGS"
         if python3 build/layers/openembedded-core/scripts/yocto-check-layer \
           . \
-          --no-auto-dependency \
+          $DEPENDENCY_ARGS \
+          --dependency build/layers/openembedded-core/meta \
+          --dependency build/layers/meta-openembedded/meta-oe \
           --output-log distro-layer-check-${{ matrix.yocto_branch }}.log; then
           echo "✅ yocto-check-layer completed successfully"
         else
