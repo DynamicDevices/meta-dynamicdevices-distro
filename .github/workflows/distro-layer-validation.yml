@@ -110,6 +110,36 @@ jobs:
         git clone -b ${{ matrix.oe_core_branch }} \
           https://github.com/openembedded/meta-openembedded.git \
           build/layers/meta-openembedded
+        
+        # Clone meta-lmp for LmP distro dependencies (needed for distro layer validation)
+        git clone -b ${{ matrix.oe_core_branch }} \
+          https://github.com/foundriesio/meta-lmp.git \
+          build/layers/meta-lmp || echo "meta-lmp not available for ${{ matrix.oe_core_branch }}, using fallback"
+        
+        # Create minimal meta-lmp-base if meta-lmp clone failed
+        if [ ! -d "build/layers/meta-lmp" ]; then
+          mkdir -p build/layers/meta-lmp-base/conf
+          cat > build/layers/meta-lmp-base/conf/layer.conf << 'EOF'
+        BBPATH .= ":${LAYERDIR}"
+        BBFILES += "${LAYERDIR}/recipes*/*/*.bb ${LAYERDIR}/recipes*/*/*.bbappend"
+        BBFILE_COLLECTIONS += "meta-lmp-base"
+        BBFILE_PATTERN_meta-lmp-base = "^${LAYERDIR}/"
+        BBFILE_PRIORITY_meta-lmp-base = "5"
+        LAYERVERSION_meta-lmp-base = "1"
+        LAYERSERIES_COMPAT_meta-lmp-base = "scarthgap kirkstone"
+        EOF
+          
+          # Create minimal LmP distro config for testing
+          mkdir -p build/layers/meta-lmp-base/conf/distro
+          cat > build/layers/meta-lmp-base/conf/distro/lmp.conf << 'EOF'
+        require conf/distro/poky.conf
+        DISTRO = "lmp"
+        DISTRO_NAME = "Linux-microPlatform"
+        DISTRO_FEATURES:append = " systemd"
+        DISTRO_FEATURES:remove = "sysvinit"
+        VIRTUAL-RUNTIME_init_manager = "systemd"
+        EOF
+        fi
 
     - name: Validate Distro Layer Structure
       run: |
@@ -192,6 +222,17 @@ jobs:
         BBLAYERS ?= " \\
           \${TOPDIR}/../build/layers/openembedded-core/meta \\
           \${TOPDIR}/../build/layers/meta-openembedded/meta-oe \\
+        EOF
+        
+        # Add meta-lmp layers if available
+        if [ -d "../build/layers/meta-lmp" ]; then
+          echo "  \${TOPDIR}/../build/layers/meta-lmp/meta-lmp-base \\" >> build/conf/bblayers.conf
+        else
+          echo "  \${TOPDIR}/../build/layers/meta-lmp-base \\" >> build/conf/bblayers.conf
+        fi
+        
+        # Add the distro layer being tested
+        cat >> build/conf/bblayers.conf << EOF
           \${TOPDIR}/.. \\
         "
         EOF
