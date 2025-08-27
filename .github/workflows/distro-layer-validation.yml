@@ -253,7 +253,7 @@ jobs:
         fi
 
     - name: Upload Distro Layer Check Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: distro-layer-check-results-${{ matrix.yocto_branch }}
@@ -287,7 +287,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download All Artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: artifacts/
 
@@ -333,7 +333,7 @@ jobs:
         echo "For detailed requirements, see the main repository [docs/YOCTO_PROJECT_COMPATIBLE.md](https://github.com/DynamicDevices/meta-dynamicdevices/blob/main/docs/YOCTO_PROJECT_COMPATIBLE.md)" >> distro-compliance-report.md
 
     - name: Upload Distro Compliance Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: distro-yocto-compliance-report
         path: distro-compliance-report.md
