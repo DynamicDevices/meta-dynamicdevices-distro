@@ -109,9 +109,11 @@ jobs:
           build/layers/meta-openembedded
         
         # Clone meta-lmp for LmP distro dependencies (needed for distro layer validation)
-        git clone -b ${{ matrix.oe_core_branch }} \
+        if ! git clone -b ${{ matrix.oe_core_branch }} \
           https://github.com/foundriesio/meta-lmp.git \
-          build/layers/meta-lmp || echo "meta-lmp not available for ${{ matrix.oe_core_branch }}, using fallback"
+          build/layers/meta-lmp; then
+          echo "meta-lmp not available for ${{ matrix.oe_core_branch }}, using fallback"
+        fi
         
         # Create minimal meta-lmp-base if meta-lmp clone failed
         if [ ! -d "build/layers/meta-lmp" ]; then
@@ -205,15 +207,19 @@ jobs:
         echo "=== Running yocto-check-layer on Distro Layer ==="
         
         # Set up BitBake environment
-        export PYTHONPATH="build/layers/bitbake/lib:$PYTHONPATH"
-        export PATH="build/layers/bitbake/bin:build/layers/openembedded-core/scripts:$PATH"
+        export PYTHONPATH="$(pwd)/build/layers/bitbake/lib:$PYTHONPATH"
+        export PATH="$(pwd)/build/layers/bitbake/bin:$(pwd)/build/layers/openembedded-core/scripts:$PATH"
         
         # Create minimal build configuration
         mkdir -p build/conf
         
         # Initialize Yocto environment first
         cd build
-        source ../build/layers/openembedded-core/oe-init-build-env . || echo "oe-init-build-env not available, continuing with manual setup"
+        if [ -f "../build/layers/openembedded-core/oe-init-build-env" ]; then
+          source ../build/layers/openembedded-core/oe-init-build-env .
+        else
+          echo "oe-init-build-env not available, continuing with manual setup"
+        fi
         cd ..
         
         # Create bblayers.conf
@@ -264,18 +270,29 @@ jobs:
         # Test BitBake environment first
         cd build
         echo "Testing BitBake environment..."
-        bitbake-layers show-layers || echo "BitBake environment test completed"
+        if ! bitbake-layers show-layers; then
+          echo "Warning: BitBake environment test failed, but continuing"
+        fi
         
         # Test basic parsing
         echo "Testing basic recipe parsing..."
-        bitbake -p || echo "Parse test completed"
+        if ! bitbake -p; then
+          echo "Warning: Parse test failed, but continuing"
+        fi
         
         # Run the layer check
         echo "Running yocto-check-layer..."
-        python3 ../build/layers/openembedded-core/scripts/yocto-check-layer \
-          .. \
+        # Run yocto-check-layer with proper environment setup
+        # The layer being tested is the current directory (.)
+        if python3 build/layers/openembedded-core/scripts/yocto-check-layer \
+          . \
           --no-auto-dependency \
-          --output-log ../distro-layer-check-${{ matrix.yocto_branch }}.log
+          --output-log distro-layer-check-${{ matrix.yocto_branch }}.log; then
+          echo "✅ yocto-check-layer completed successfully"
+        else
+          echo "❌ yocto-check-layer failed - this will cause the build to fail"
+          exit 1
+        fi
 
     - name: Analyze Distro Layer Check Results
       run: |
