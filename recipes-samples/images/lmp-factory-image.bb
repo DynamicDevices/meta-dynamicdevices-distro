@@ -115,6 +115,9 @@ CORE_IMAGE_BASE_INSTALL += " \
     ${@bb.utils.contains('LMP_DISABLE_GPLV3', '1', '', '${CORE_IMAGE_BASE_INSTALL_GPLV3}', d)} \
 "
 
+# Add custom hostname generator for i.MX93 boards
+CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " imx93-hostname-generator"
+
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-sentai = " \
     socat \
     default-network-manager \
