@@ -71,6 +71,12 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
+# Enable EL133UF1 e-ink display driver for eink boards
+require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-eink-spectra6.inc', '', d)}
+
+# Enable boot profiling if requested
+require ${@bb.utils.contains('ENABLE_BOOT_PROFILING', '1', 'recipes-samples/images/lmp-feature-boot-profiling.inc', '', d)}
+
 # Set image features based on DEV_MODE environment variable defined in Factory configuration
 IMAGE_FEATURES += "${@bb.utils.contains('DEV_MODE', '1', 'debug-tweaks tools-sdk', '', d)}"
 
