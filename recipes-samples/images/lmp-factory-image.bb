@@ -50,8 +50,8 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'xeno4', 'recipes-samples/image
 # Enable Intel AX210 WiFi related recipes if required by MACHINE
 require ${@bb.utils.contains('MACHINE_FEATURES', 'ax210', 'recipes-samples/images/lmp-feature-ax210.inc', '', d)}
 
-# Enable TI tas2563 related recipes if required by MACHINE
-require ${@bb.utils.contains('MACHINE_FEATURES', 'tas2563', 'recipes-samples/images/lmp-feature-tas2563.inc', '', d)}
+# Enable TI tas2563/tas2781 integrated driver related recipes if required by MACHINE
+require ${@bb.utils.contains('MACHINE_FEATURES', 'tas2781-integrated', 'recipes-samples/images/lmp-feature-tas2781-integrated.inc', '', d)}
 
 # Enable ST usb4500 related recipes if required by MACHINE
 require ${@bb.utils.contains('MACHINE_FEATURES', 'stusb4500', 'recipes-samples/images/lmp-feature-stusb4500.inc', '', d)}
@@ -69,10 +69,10 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'upd72020x', 'recipes-samples/i
 require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/images/lmp-feature-zigbee.inc', '', d)}
 
 # Enable power management for eink boards
-require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
+require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
-# E Ink display driver support removed - can be re-added when ready
-# require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-eink-spectra6.inc', '', d)}
+# E-Ink Spectra 6 EL133UF1 display support
+require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-spectra6.inc', '', d)}
 
 # Enable boot profiling if requested
 require ${@bb.utils.contains('ENABLE_BOOT_PROFILING', '1', 'recipes-samples/images/lmp-feature-boot-profiling.inc', '', d)}
@@ -138,6 +138,11 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        default-network-manager \
 "
+
+# === Image Size Configuration for imx93-jaguar-eink ===
+# Increase root partition size to accommodate all packages and avoid "Image too large" errors
+IMAGE_ROOTFS_EXTRA_SPACE:append:imx93-jaguar-eink = " + 1048576"
+WKS_FILE:imx93-jaguar-eink = "imx93-jaguar-eink-large.wks"
 
 IMAGE_FEATURES += "ssh-server-openssh"
 
