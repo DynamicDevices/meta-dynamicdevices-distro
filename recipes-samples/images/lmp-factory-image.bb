@@ -77,6 +77,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/im
 # Enable boot profiling if requested
 require ${@bb.utils.contains('ENABLE_BOOT_PROFILING', '1', 'recipes-samples/images/lmp-feature-boot-profiling.inc', '', d)}
 
+# Enable EdgeLock Enclave testing for i.MX93 development builds only
+require ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-ele-testing.inc', '', d), '', d)}
+
 # Set image features based on DEV_MODE environment variable defined in Factory configuration
 IMAGE_FEATURES += "${@bb.utils.contains('DEV_MODE', '1', 'debug-tweaks tools-sdk', '', d)}"
 
