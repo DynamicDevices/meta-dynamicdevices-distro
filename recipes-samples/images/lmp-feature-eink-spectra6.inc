@@ -26,10 +26,10 @@ CORE_IMAGE_BASE_INSTALL += " \
     imagemagick \
 "
 
-# Python support for E-Ink scripting (optional)
+# Python support for E-Ink scripting (optional - only if meta-python layer is available)
 CORE_IMAGE_BASE_INSTALL += " \
     python3-spidev \
-    python3-gpiod \
+    ${@bb.utils.contains('BBFILE_COLLECTIONS', 'meta-python', 'python3-gpiod', '', d)} \
     python3-pillow \
 "
 
