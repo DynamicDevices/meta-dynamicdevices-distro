@@ -29,7 +29,6 @@ CORE_IMAGE_BASE_INSTALL += " \
 # Python support for E-Ink scripting (optional)
 CORE_IMAGE_BASE_INSTALL += " \
     python3-spidev \
-    python3-gpiod \
     python3-pillow \
 "
 
