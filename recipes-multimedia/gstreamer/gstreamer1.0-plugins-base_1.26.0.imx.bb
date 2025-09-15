@@ -100,6 +100,27 @@ CVE_PRODUCT += "gst-plugins-base"
 # Default preference for i.MX fork (matches 1.24.0.imx pattern)
 DEFAULT_PREFERENCE = "-1"
 
+# i.MX specific configurations
+inherit use-imx-headers
+
+PACKAGECONFIG:remove = "${PACKAGECONFIG_REMOVE}"
+PACKAGECONFIG_REMOVE ?= "jpeg"
+
+PACKAGECONFIG:append = " ${PACKAGECONFIG_G2D}"
+PACKAGECONFIG_G2D          ??= ""
+PACKAGECONFIG_G2D:imxgpu2d ??= "g2d"
+
+PACKAGECONFIG[g2d] = ",,virtual/libg2d"
+PACKAGECONFIG[viv-fb] = ",,virtual/libgles2"
+
+# GCC-14 otherwise errors out
+CFLAGS += "-Wno-error=incompatible-pointer-types"
+EXTRA_OEMESON:append = " -Dc_args='${CFLAGS} -I${STAGING_INCDIR_IMX}'"
+
+# links with imx-gpu libs which are pre-built for glibc
+# gcompat will address it during runtime
+LDFLAGS:append:imxgpu:libc-musl = " -Wl,--allow-shlib-undefined"
+
 # Compatible with i.MX platforms
 COMPATIBLE_MACHINE = "(imx-nxp-bsp)"
 
