@@ -124,10 +124,6 @@ LDFLAGS:append:imxgpu:libc-musl = " -Wl,--allow-shlib-undefined"
 # Compatible with i.MX platforms
 COMPATIBLE_MACHINE = "(imx-nxp-bsp)"
 
-PACKAGES =+ "${PN}-apps ${PN}-meta"
-
-FILES:${PN}-apps = "${bindir}"
-
-RDEPENDS:${PN}-dev += "${PN}-apps (= ${EXTENDPKGV})"
+# Let automatic packaging handle all packages - don't override PACKAGES
 
 CVE_PRODUCT = "gstreamer"
