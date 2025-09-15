@@ -127,7 +127,6 @@ COMPATIBLE_MACHINE = "(imx-nxp-bsp)"
 PACKAGES =+ "${PN}-apps ${PN}-meta"
 
 FILES:${PN}-apps = "${bindir}"
-FILES:${PN}-meta = "${datadir}/gst-plugins-base/1.0/gst-plugins-base.pot"
 
 RDEPENDS:${PN}-dev += "${PN}-apps (= ${EXTENDPKGV})"
 
