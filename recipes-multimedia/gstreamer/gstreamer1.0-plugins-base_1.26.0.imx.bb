@@ -40,43 +40,62 @@ X11DISABLEOPTS = "-Dx11=disabled -Dxvideo=disabled -Dxshm=disabled"
 
 PACKAGECONFIG[alsa]         = "-Dalsa=enabled,-Dalsa=disabled,alsa-lib"
 PACKAGECONFIG[cdparanoia]   = "-Dcdparanoia=enabled,-Dcdparanoia=disabled,cdparanoia"
-PACKAGECONFIG[egl]          = "-Degl=enabled,-Degl=disabled,virtual/egl"
-PACKAGECONFIG[gio-unix-2.0] = "-Dgio-unix-2.0=enabled,-Dgio-unix-2.0=disabled,glib-2.0"
-PACKAGECONFIG[gl]           = "-Dgl=enabled,-Dgl=disabled,virtual/libgl libglu"
-PACKAGECONFIG[gles2]        = "-Dgles2=enabled,-Dgles2=disabled,virtual/libgles2"
-PACKAGECONFIG[glx]          = "-Dglx=enabled,-Dglx=disabled,virtual/libgl"
+PACKAGECONFIG[graphene]     = "-Dgl-graphene=enabled,-Dgl-graphene=disabled,graphene"
 PACKAGECONFIG[jpeg]         = "-Dgl-jpeg=enabled,-Dgl-jpeg=disabled,jpeg"
 PACKAGECONFIG[ogg]          = "-Dogg=enabled,-Dogg=disabled,libogg"
-PACKAGECONFIG[opengl]       = "-Dopengl=enabled,-Dopengl=disabled"
-PACKAGECONFIG[orc]          = "-Dorc=enabled,-Dorc=disabled,orc orc-native"
+PACKAGECONFIG[opus]         = "-Dopus=enabled,-Dopus=disabled,libopus"
 PACKAGECONFIG[pango]        = "-Dpango=enabled,-Dpango=disabled,pango"
 PACKAGECONFIG[png]          = "-Dgl-png=enabled,-Dgl-png=disabled,libpng"
+# This enables Qt5 QML examples in -base. The Qt5 GStreamer
+# qmlglsink and qmlglsrc plugins still exist in -good.
+PACKAGECONFIG[qt5]          = "-Dqt5=enabled,-Dqt5=disabled,qtbase qtdeclarative qtbase-native"
 PACKAGECONFIG[theora]       = "-Dtheora=enabled,-Dtheora=disabled,libtheora"
 PACKAGECONFIG[tremor]       = "-Dtremor=enabled,-Dtremor=disabled,tremor"
+PACKAGECONFIG[visual]       = "-Dlibvisual=enabled,-Dlibvisual=disabled,libvisual"
 PACKAGECONFIG[vorbis]       = "-Dvorbis=enabled,-Dvorbis=disabled,libvorbis"
-PACKAGECONFIG[wayland]      = "-Dwayland=enabled,-Dwayland=disabled,wayland-native wayland wayland-protocols libdrm"
 PACKAGECONFIG[x11]          = "${X11ENABLEOPTS},${X11DISABLEOPTS},${X11DEPENDS}"
+
+# OpenGL API packageconfigs
+PACKAGECONFIG[opengl]       = ",,virtual/libgl libglu"
+PACKAGECONFIG[gles2]        = ",,virtual/libgles2"
+
+# OpenGL platform packageconfigs
+PACKAGECONFIG[egl]          = ",,virtual/egl"
+PACKAGECONFIG[glx]          = ",,virtual/libgl"
+
+# OpenGL window systems (except for X11)
+PACKAGECONFIG[gbm]          = ",,virtual/libgbm libgudev libdrm"
+PACKAGECONFIG[wayland]      = ",,wayland-native wayland wayland-protocols libdrm"
+PACKAGECONFIG[dispmanx]     = ",,virtual/libomxil"
+PACKAGECONFIG[viv-fb]       = ",,virtual/libgles2 virtual/libg2d"
+
+OPENGL_WINSYS = "${@bb.utils.filter('PACKAGECONFIG', 'x11 gbm wayland dispmanx egl viv-fb', d)}"
 
 EXTRA_OEMESON += " \
     -Ddoc=disabled \
-    -Dexamples=disabled \
     ${@get_opengl_cmdline_list('gl_api', d.getVar('OPENGL_APIS'), d)} \
     ${@get_opengl_cmdline_list('gl_platform', d.getVar('OPENGL_PLATFORMS'), d)} \
+    ${@get_opengl_cmdline_list('gl_winsys', d.getVar('OPENGL_WINSYS'), d)} \
 "
 
 def get_opengl_cmdline_list(switch_name, options, d):
     selected_options = []
-    if bb.utils.contains('PACKAGECONFIG', 'opengl', True, False, d):
+    if bb.utils.contains('DISTRO_FEATURES', 'opengl', True, False, d):
         for option in options.split():
             if bb.utils.contains('PACKAGECONFIG', option, True, False, d):
-                selected_options.append(option)
+                selected_options += [option]
     if selected_options:
         return '-D' + switch_name + '=' + ','.join(selected_options)
     else:
-        return '-D' + switch_name + '=auto'
+        return ''
+
+FILES:${PN}-dev += "${libdir}/gstreamer-1.0/include/gst/gl/gstglconfig.h"
+FILES:${MLPREFIX}libgsttag-1.0 += "${datadir}/gst-plugins-base/1.0/license-translations.dict"
 
 GIR_MESON_ENABLE_FLAG = "enabled"
 GIR_MESON_DISABLE_FLAG = "disabled"
+
+CVE_PRODUCT += "gst-plugins-base"
 
 # Default preference for i.MX fork (matches 1.24.0.imx pattern)
 DEFAULT_PREFERENCE = "-1"
