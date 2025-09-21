@@ -72,7 +72,7 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
 # E-Ink Spectra 6 EL133UF1 display support
-require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-spectra6.inc', '', d)}
+# Note: eink-spectra6 support is provided by meta-subscriber-overrides (private repository)
 
 # Enable boot profiling if requested
 require ${@bb.utils.contains('ENABLE_BOOT_PROFILING', '1', 'recipes-samples/images/lmp-feature-boot-profiling.inc', '', d)}
