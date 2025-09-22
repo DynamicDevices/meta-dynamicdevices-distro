@@ -71,6 +71,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
+# Enable MCUboot support for boards with microcontrollers
+require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
+
 # E-Ink Spectra 6 EL133UF1 display support
 # Note: eink-spectra6 support is provided by meta-subscriber-overrides (private repository)
 
