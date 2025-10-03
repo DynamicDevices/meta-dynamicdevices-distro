@@ -143,6 +143,13 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
 
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        default-network-manager \
+       libpng \
+       libpng-dev \
+       jpeg \
+       libjpeg-turbo \
+       libjpeg-turbo-dev \
+       libcurl \
+       curl-dev \
 "
 
 # === Image Size Configuration for imx93-jaguar-eink ===
