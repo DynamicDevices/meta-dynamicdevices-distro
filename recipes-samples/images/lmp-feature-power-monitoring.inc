@@ -36,8 +36,7 @@ IMAGE_INSTALL:append = " \
 # Network monitoring for WiFi power analysis
 IMAGE_INSTALL:append = " \
     tcpdump \
-    netstat \
-    ss \
+    iproute2 \
     ethtool \
     wireless-tools \
     iw \
@@ -46,28 +45,21 @@ IMAGE_INSTALL:append = " \
 # Kernel debugging and tracing tools
 IMAGE_INSTALL:append = " \
     trace-cmd \
-    kernelshark \
-    ftrace \
 "
 
 # File system and I/O monitoring
 IMAGE_INSTALL:append = " \
     iotop \
-    iostat \
-    vmstat \
     pv \
 "
 
 # Temperature and thermal monitoring
 IMAGE_INSTALL:append = " \
     lm-sensors \
-    sensors \
 "
 
 # Power management utilities
 IMAGE_INSTALL:append = " \
-    cpufrequtils \
-    pm-utils \
     upower \
 "
 
