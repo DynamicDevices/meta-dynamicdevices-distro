@@ -92,6 +92,9 @@ IMAGE_FEATURES += "${@bb.utils.contains('CE_TESTING', '1', 'ce-testing', '', d)}
 # Enable development related recipes if required by IMAGE_FEATURES
 require ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', 'recipes-samples/images/lmp-feature-dev.inc', '', d)}
 
+# Enable power monitoring tools for development builds
+require ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', 'recipes-samples/images/lmp-feature-power-monitoring.inc', '', d)}
+
 # Enable CE test related recipes if required by IMAGE_FEATURES
 require ${@bb.utils.contains('IMAGE_FEATURES', 'ce-testing', 'recipes-samples/images/lmp-feature-ce-testing.inc', '', d)}
 
