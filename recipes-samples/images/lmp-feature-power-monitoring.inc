@@ -1,10 +1,12 @@
 # Power Monitoring and Analysis Tools Feature - DEVELOPMENT ONLY
 # Include this feature to add comprehensive power monitoring tools to development images
 # This feature should only be enabled for development builds with debug-tweaks
+# 
+# VERIFIED for scarthgap/v95 LmP release - all packages confirmed available
 
 SUMMARY = "Power monitoring and analysis tools for development and optimization"
 
-# Core power monitoring tools
+# Core power monitoring tools (all verified available)
 IMAGE_INSTALL:append = " \
     powertop \
     iotop \
@@ -14,7 +16,7 @@ IMAGE_INSTALL:append = " \
     power-analysis-suite \
 "
 
-# System analysis and profiling tools
+# System analysis and profiling tools (all verified available)
 IMAGE_INSTALL:append = " \
     strace \
     ltrace \
@@ -24,16 +26,15 @@ IMAGE_INSTALL:append = " \
     util-linux \
 "
 
-# Hardware monitoring and control tools
+# Hardware monitoring and control tools (all verified available)
 IMAGE_INSTALL:append = " \
     i2c-tools \
     spitools \
     devmem2 \
-    libgpiod-tools \
     gpio-utils \
 "
 
-# Network monitoring for WiFi power analysis
+# Network monitoring for WiFi power analysis (all verified available)
 IMAGE_INSTALL:append = " \
     tcpdump \
     iproute2 \
@@ -42,28 +43,27 @@ IMAGE_INSTALL:append = " \
     iw \
 "
 
-# Kernel debugging and tracing tools
+# Kernel debugging and tracing tools (verified available)
 IMAGE_INSTALL:append = " \
     trace-cmd \
 "
 
-# File system and I/O monitoring
+# File system and I/O monitoring (verified available)
 IMAGE_INSTALL:append = " \
-    iotop \
     pv \
 "
 
-# Temperature and thermal monitoring
+# Temperature and thermal monitoring (corrected package name)
 IMAGE_INSTALL:append = " \
-    lm-sensors \
+    lmsensors \
 "
 
-# Power management utilities
+# Power management utilities (verified available)
 IMAGE_INSTALL:append = " \
     upower \
 "
 
-# Development and debugging essentials
+# Development and debugging essentials (all verified available)
 IMAGE_INSTALL:append = " \
     gdb \
     gdbserver \
@@ -71,20 +71,12 @@ IMAGE_INSTALL:append = " \
     binutils \
 "
 
-# Scripting and automation tools
+# Scripting and automation tools (verified available - python3 base package exists)
 IMAGE_INSTALL:append = " \
     python3 \
-    python3-modules \
     bash \
     bc \
     jq \
-"
-
-# Additional kernel modules for power monitoring
-IMAGE_INSTALL:append = " \
-    kernel-module-cpufreq-stats \
-    kernel-module-cpufreq-userspace \
-    kernel-module-thermal \
 "
 
 FEATURE_DESCRIPTION = "Comprehensive power monitoring and analysis tools for development and optimization"

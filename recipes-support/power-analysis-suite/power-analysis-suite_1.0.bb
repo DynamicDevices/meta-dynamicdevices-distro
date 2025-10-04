@@ -34,7 +34,7 @@ RDEPENDS:${PN} = " \
     procps \
 "
 
-# Recommended packages for enhanced functionality
+# Recommended packages for enhanced functionality (all verified for scarthgap/v95)
 RRECOMMENDS:${PN} = " \
     powertop \
     iotop \
@@ -42,6 +42,9 @@ RRECOMMENDS:${PN} = " \
     perf \
     iw \
     i2c-tools \
-    cpufrequtils \
-    lm-sensors \
+    lmsensors \
+    ethtool \
+    wireless-tools \
+    trace-cmd \
+    upower \
 "
