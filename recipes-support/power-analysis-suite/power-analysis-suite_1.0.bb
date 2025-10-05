@@ -39,7 +39,6 @@ RRECOMMENDS:${PN} = " \
     powertop \
     iotop \
     htop \
-    perf \
     iw \
     i2c-tools \
     lmsensors \

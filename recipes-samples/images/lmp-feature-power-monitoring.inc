@@ -12,7 +12,6 @@ IMAGE_INSTALL:append = " \
     iotop \
     htop \
     sysstat \
-    perf \
     power-analysis-suite \
 "
 
