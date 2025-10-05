@@ -34,6 +34,7 @@ IMAGE_INSTALL:append = " \
 "
 
 # Network monitoring for WiFi power analysis (all verified available)
+# Updated iw package with TWT support for WiFi 6 power optimization
 IMAGE_INSTALL:append = " \
     tcpdump \
     iproute2 \
