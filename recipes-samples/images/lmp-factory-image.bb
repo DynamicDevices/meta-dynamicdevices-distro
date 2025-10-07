@@ -84,7 +84,8 @@ require ${@bb.utils.contains('ENABLE_BOOT_PROFILING', '1', 'recipes-samples/imag
 require ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'recipes-samples/images/lmp-feature-ele-testing.inc', '', d), '', d)}
 
 # Set image features based on DEV_MODE environment variable defined in Factory configuration
-IMAGE_FEATURES += "${@bb.utils.contains('DEV_MODE', '1', 'debug-tweaks tools-sdk', '', d)}"
+# Only include debug-tweaks for runtime debugging, not tools-sdk which bloats the image
+IMAGE_FEATURES += "${@bb.utils.contains('DEV_MODE', '1', 'debug-tweaks', '', d)}"
 
 # Set image features based on CE_TEST environment variable defined in Factory configuration
 IMAGE_FEATURES += "${@bb.utils.contains('CE_TESTING', '1', 'ce-testing', '', d)}"
