@@ -158,6 +158,9 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        curl-dev \
 "
 
+# Include audit feature for comprehensive logging and security monitoring
+require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'lmp-feature-audit.inc', '', d)}
+
 # === Image Size Configuration for imx93-jaguar-eink ===
 # Increase root partition size to accommodate all packages and avoid "Image too large" errors
 IMAGE_ROOTFS_EXTRA_SPACE:append:imx93-jaguar-eink = " + 1048576"
