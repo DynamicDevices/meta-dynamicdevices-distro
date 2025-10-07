@@ -147,7 +147,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        default-network-manager \
        libpng \
-       rng-tools-service \
+       rng-tools \
        libpng-dev \
        jpeg \
        libjpeg-turbo \
