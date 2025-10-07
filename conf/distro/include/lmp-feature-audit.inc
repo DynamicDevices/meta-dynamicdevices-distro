@@ -1,14 +1,15 @@
 #
-# DISTRO Feature: audit
+# LMP Feature: audit
 # Comprehensive logging and audit framework for production security monitoring
 #
-# This feature provides:
+# This LMP feature provides:
 # - System call auditing (audit package)
 # - Advanced system logging (rsyslog)
 # - Automated log rotation (logrotate)
 # - System performance analysis (systemd-analyze)
 #
 # Usage: Add "audit" to DISTRO_FEATURES for boards requiring comprehensive logging
+# Compatible with all LMP-based distros (lmp, lmp-dynamicdevices, lmp-dynamicdevices-headless)
 #
 
 # Add audit and logging packages when audit feature is enabled
