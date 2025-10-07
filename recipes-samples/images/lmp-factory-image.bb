@@ -147,6 +147,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        default-network-manager \
        libpng \
+       imx-secure-enclave \
        nxp-ele-test-suite \
        rng-tools-service \
        libpng-dev \
