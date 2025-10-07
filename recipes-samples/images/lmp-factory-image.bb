@@ -156,21 +156,12 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libjpeg-turbo-dev \
        libcurl \
        curl-dev \
-       audit \
-       logrotate \
-       rsyslog \
-       systemd-analyze \
 "
 
 # === Image Size Configuration for imx93-jaguar-eink ===
 # Increase root partition size to accommodate all packages and avoid "Image too large" errors
 IMAGE_ROOTFS_EXTRA_SPACE:append:imx93-jaguar-eink = " + 1048576"
 WKS_FILE:imx93-jaguar-eink = "imx93-jaguar-eink-large.wks"
-
-# === Service Auto-Enable Configuration for imx93-jaguar-eink ===
-# Enable comprehensive audit and logging services
-SYSTEMD_AUTO_ENABLE:pn-audit:imx93-jaguar-eink = "enable"
-SYSTEMD_AUTO_ENABLE:pn-rsyslog:imx93-jaguar-eink = "enable"
 
 IMAGE_FEATURES += "ssh-server-openssh"
 
