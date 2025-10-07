@@ -149,6 +149,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libpng \
        imx-secure-enclave \
        nxp-ele-test-suite \
+       rng-tools-service \
        libpng-dev \
        jpeg \
        libjpeg-turbo \
