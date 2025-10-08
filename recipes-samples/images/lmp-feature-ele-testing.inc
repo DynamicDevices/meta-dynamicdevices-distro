@@ -7,6 +7,7 @@ SUMMARY = "EdgeLock Enclave testing tools and utilities for development"
 # Add ELE test suite for i.MX93 development
 IMAGE_INSTALL:append = " \
     nxp-ele-test-suite \
+    nxp-ele-dev-tools \
 "
 
 # Add additional debugging and development tools for ELE
