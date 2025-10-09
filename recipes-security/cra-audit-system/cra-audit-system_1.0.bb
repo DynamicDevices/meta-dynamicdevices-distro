@@ -67,10 +67,8 @@ do_install() {
     # Create audit directories with proper permissions
     install -d ${D}${localstatedir}/sota/audit-queue
     install -d ${D}${localstatedir}/sota/audit-uploaded
-    install -d ${D}${localstatedir}/log
-
-    # Create audit log file
-    touch ${D}${localstatedir}/log/cra-audit-events.log
+    # Create log directory in /var/sota instead of /var/log to avoid symlink issues
+    install -d ${D}${localstatedir}/sota/logs
 }
 
 FILES:${PN} = " \
@@ -85,7 +83,7 @@ FILES:${PN} = " \
     ${sysconfdir}/audit/rules.d/cra-audit.rules \
     ${localstatedir}/sota/audit-queue \
     ${localstatedir}/sota/audit-uploaded \
-    ${localstatedir}/log/cra-audit-events.log \
+    ${localstatedir}/sota/logs \
 "
 
 # This is a distro-level compliance feature
