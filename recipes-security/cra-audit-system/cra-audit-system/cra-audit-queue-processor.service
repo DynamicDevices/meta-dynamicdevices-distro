@@ -1,0 +1,32 @@
+[Unit]
+Description=CRA Audit Queue Processor for EU Cyber Resilience Act Compliance
+Documentation=man:cra-audit-handler.sh(1)
+Wants=network-online.target
+After=network-online.target aktualizr-lite.service
+ConditionPathExists=/var/sota/sota.toml
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/etc/default/cra-audit
+ExecStart=/usr/bin/cra-audit-handler.sh queue
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cra-audit-queue
+
+# Security settings
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/sota /tmp
+ProtectHome=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+MemoryMax=32M
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target

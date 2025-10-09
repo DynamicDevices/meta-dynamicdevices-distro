@@ -1,0 +1,38 @@
+# CRA Audit Rules for EU Cyber Resilience Act Compliance
+# These rules configure auditd to monitor security-relevant events
+# and trigger our CRA audit handler automatically
+
+# Monitor authentication events
+-w /var/log/auth.log -p wa -k cra_auth_events
+-w /var/log/secure -p wa -k cra_auth_events
+-w /etc/passwd -p wa -k cra_user_changes
+-w /etc/shadow -p wa -k cra_user_changes
+-w /etc/group -p wa -k cra_user_changes
+
+# Monitor system configuration changes
+-w /etc/ssh/sshd_config -p wa -k cra_config_changes
+-w /etc/systemd/ -p wa -k cra_config_changes
+-w /var/sota/ -p wa -k cra_foundries_changes
+
+# Monitor privilege escalation
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -k cra_privilege_escalation
+-a always,exit -F arch=b32 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -k cra_privilege_escalation
+
+# Monitor network configuration changes
+-w /etc/hosts -p wa -k cra_network_changes
+-w /etc/resolv.conf -p wa -k cra_network_changes
+
+# Monitor file permission changes
+-a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -k cra_permission_changes
+-a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -k cra_permission_changes
+
+# Monitor security module events
+-w /etc/selinux/ -p wa -k cra_security_changes
+
+# Monitor kernel module loading
+-a always,exit -F arch=b64 -S init_module -S delete_module -k cra_kernel_modules
+-a always,exit -F arch=b32 -S init_module -S delete_module -k cra_kernel_modules
+
+# Monitor process creation (limited to avoid performance impact)
+-a always,exit -F arch=b64 -S execve -F success=0 -k cra_failed_exec
+-a always,exit -F arch=b32 -S execve -F success=0 -k cra_failed_exec

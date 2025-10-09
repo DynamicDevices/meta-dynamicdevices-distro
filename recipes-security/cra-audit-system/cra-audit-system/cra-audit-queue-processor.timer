@@ -1,0 +1,19 @@
+[Unit]
+Description=CRA Audit Queue Processor Timer for EU Cyber Resilience Act Compliance
+Documentation=man:cra-audit-handler.sh(1)
+Requires=cra-audit-queue-processor.service
+
+[Timer]
+# Process queue every 15 minutes for CRA compliance
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=300
+
+# Also process on boot (after network is available)
+OnBootSec=5min
+
+# Process when network connectivity is restored
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

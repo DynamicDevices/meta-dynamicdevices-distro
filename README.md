@@ -15,6 +15,7 @@ Distribution layer for Dynamic Devices Edge Computing platforms, providing custo
 This layer provides distribution configurations that extend the standard Linux microPlatform (LmP) with Dynamic Devices-specific features:
 
 - **Security-focused configurations** - Disabled zeroconf, enhanced security policies
+- **CRA compliance system** - Automated EU Cyber Resilience Act audit event reporting
 - **Device auto-registration** - Automatic device onboarding and management
 - **Platform-specific optimizations** - Audio, connectivity, and power management features
 - **Commercial license support** - For proprietary components and applications
@@ -36,9 +37,17 @@ The wiki includes:
 ### `lmp-dynamicdevices`
 Base distribution with core Dynamic Devices features:
 - Security hardening (no zeroconf)
+- EU CRA compliance audit system
 - Device auto-registration
 - Commercial license support
 - Platform-specific optimizations
+
+### `lmp-dynamicdevices-headless`
+Headless distribution optimized for embedded applications:
+- No GUI frameworks (Wayland, X11, PulseAudio removed)
+- CRA compliance system for regulatory requirements
+- Enhanced security configurations
+- Minimal resource footprint
 
 ### `lmp-dynamicdevices-base`
 Minimal base distribution for embedded applications
