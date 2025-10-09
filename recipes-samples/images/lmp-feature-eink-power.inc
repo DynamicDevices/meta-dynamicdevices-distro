@@ -7,6 +7,7 @@ SUMMARY = "LMP E-ink board power management features"
 IMAGE_INSTALL:append = " \
     wifi-power-management \
     eink-power-management \
+    eink-power-cli \
     fast-boot-optimization \
     pm-utils \
     powertop \
