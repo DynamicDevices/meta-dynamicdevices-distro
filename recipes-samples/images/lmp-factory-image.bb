@@ -155,6 +155,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libjpeg-turbo-dev \
        libcurl \
        curl-dev \
+       stm32flash \
 "
 
 # Include audit feature for comprehensive logging and security monitoring
