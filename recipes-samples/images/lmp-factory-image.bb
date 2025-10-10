@@ -71,9 +71,6 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
-# Enable T2000 USB signage support
-require ${@bb.utils.contains('MACHINE_FEATURES', 't2000-usb-signage', 'recipes-samples/images/lmp-feature-t2000-signage.inc', '', d)}
-
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
 
