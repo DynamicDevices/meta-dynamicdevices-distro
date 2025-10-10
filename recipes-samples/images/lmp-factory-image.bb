@@ -137,6 +137,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-sentai = " \
     socat \
     default-network-manager \
     gstreamer1.0-rtsp-server gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+    stm32flash \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
