@@ -192,8 +192,10 @@ IMAGE_FEATURES += "ssh-server-openssh"
 #ROOTFS_POSTPROCESS_COMMAND:imx8mm-jaguar-phasora += "postprocess_function; "
 
 # Disable root login - NOTE: This means we can't use "sudo su" any more *but* running commands as root works
+# Create fio user with home directory and add to required groups
 inherit extrausers
 
 EXTRA_USERS_PARAMS:append = "\
+  useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker fio; \
   usermod -s /sbin/nologin root; \
 "
