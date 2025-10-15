@@ -74,6 +74,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/im
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
 
+# Enable XM125 radar support if provided by machine
+require ${@bb.utils.contains('MACHINE_FEATURES', 'xm125-radar', 'recipes-samples/images/lmp-feature-xm125-radar.inc', '', d)}
+
 # E-Ink Spectra 6 EL133UF1 display support
 # Note: eink-spectra6 support is provided by meta-subscriber-overrides (private repository)
 
