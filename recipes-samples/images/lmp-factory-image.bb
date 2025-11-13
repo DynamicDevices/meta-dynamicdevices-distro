@@ -144,7 +144,6 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-sentai = " \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
-       uwb-mqtt-publisher \
        linux-firmware-iwlwifi \
        pciutils \
 "
