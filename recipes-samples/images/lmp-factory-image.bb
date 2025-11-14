@@ -146,6 +146,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-sentai = " \
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
        linux-firmware-iwlwifi \
        pciutils \
+       socat \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
