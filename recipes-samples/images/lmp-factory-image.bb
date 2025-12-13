@@ -198,6 +198,7 @@ IMAGE_FEATURES += "ssh-server-openssh"
 inherit extrausers
 
 EXTRA_USERS_PARAMS:append = "\
+  mkdir -p /var/rootdirs/home; \
   useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker,dialout fio; \
   usermod -s /sbin/nologin root; \
 "
