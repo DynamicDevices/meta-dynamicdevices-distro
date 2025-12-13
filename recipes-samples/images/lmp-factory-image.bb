@@ -197,8 +197,14 @@ IMAGE_FEATURES += "ssh-server-openssh"
 # Disable root login - NOTE: This means we can't use "sudo su" any more *but* running commands as root works
 inherit extrausers
 
+# Create parent directory for fio user home before useradd runs
+create_fio_home_dir() {
+    mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
+}
+
+ROOTFS_POSTPROCESS_COMMAND:prepend = "create_fio_home_dir; "
+
 EXTRA_USERS_PARAMS:append = "\
-  mkdir -p /var/rootdirs/home; \
   useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker,dialout fio; \
   usermod -s /sbin/nologin root; \
 "
