@@ -16,4 +16,5 @@ CORE_IMAGE_BASE_INSTALL += " \
    tcpdump \
    pv \
    sysstat \
+   ser2net \
 "
