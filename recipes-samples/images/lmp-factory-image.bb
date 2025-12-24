@@ -198,23 +198,16 @@ IMAGE_FEATURES += "ssh-server-openssh"
 inherit extrausers
 
 # Create parent directory for fio user home before useradd runs
-# Note: useradd -m will create the home directory, but we need to ensure
-# the parent directory exists. After useradd, we fix ownership in case
-# the directory was pre-created.
+# Create it with correct ownership (fio user, uid 1000) so useradd -m
+# creates the home directory with proper ownership
 create_fio_home_dir() {
     mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
-}
-
-fix_fio_home_ownership() {
-    # Ensure fio home directory is owned by fio user (uid 1000)
-    # This fixes the case where the directory was pre-created as root
-    if [ -d "${IMAGE_ROOTFS}/var/rootdirs/home/fio" ]; then
-        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-    fi
+    # Set ownership to fio user (uid 1000) so when useradd -m creates
+    # /var/rootdirs/home/fio, it inherits correct parent ownership
+    chown 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home 2>/dev/null || true
 }
 
 ROOTFS_POSTPROCESS_COMMAND:prepend = "create_fio_home_dir; "
-ROOTFS_POSTPROCESS_COMMAND:append = "fix_fio_home_ownership; "
 
 EXTRA_USERS_PARAMS:append = "\
   useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker,dialout fio; \
