@@ -198,16 +198,35 @@ IMAGE_FEATURES += "ssh-server-openssh"
 inherit extrausers
 
 # Create parent directory for fio user home before useradd runs
-# Create it with correct ownership (fio user, uid 1000) so useradd -m
-# creates the home directory with proper ownership
+# Note: Ownership will be fixed AFTER useradd runs to ensure consistency
 create_fio_home_dir() {
     mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
-    # Set ownership to fio user (uid 1000) so when useradd -m creates
-    # /var/rootdirs/home/fio, it inherits correct parent ownership
+}
+
+# Fix ownership of fio user home directory AFTER useradd runs
+# This ensures consistent ownership even if parent directory had root ownership
+# or if the directory was created in a previous build step
+fix_fio_home_ownership() {
+    # Ensure parent directory exists
+    mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
+    
+    # Fix ownership of parent directory (fio user, uid 1000)
     chown 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home 2>/dev/null || true
+    
+    # Explicitly fix ownership of fio home directory if it exists
+    if [ -d "${IMAGE_ROOTFS}/var/rootdirs/home/fio" ]; then
+        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio 2>/dev/null || true
+    fi
+    
+    # Also handle /home symlink case (Foundries.io/LmP creates /home -> /var/rootdirs/home)
+    # If /home/fio exists as a directory (not symlink), fix its ownership too
+    if [ -d "${IMAGE_ROOTFS}/home/fio" ] && [ ! -L "${IMAGE_ROOTFS}/home/fio" ]; then
+        chown -R 1000:1000 ${IMAGE_ROOTFS}/home/fio 2>/dev/null || true
+    fi
 }
 
 ROOTFS_POSTPROCESS_COMMAND:prepend = "create_fio_home_dir; "
+ROOTFS_POSTPROCESS_COMMAND:append = "fix_fio_home_ownership; "
 
 EXTRA_USERS_PARAMS:append = "\
   useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker,dialout fio; \
