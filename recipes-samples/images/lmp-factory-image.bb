@@ -231,4 +231,5 @@ ROOTFS_POSTPROCESS_COMMAND:append = "fix_fio_home_ownership; "
 EXTRA_USERS_PARAMS:append = "\
   useradd -r -m -d /var/rootdirs/home/fio -s /bin/sh -G sudo,audio,plugdev,users,docker,dialout fio; \
   usermod -s /sbin/nologin root; \
+  usermod -p '\$1\$fiosalt\$/RuUUKClf30ulmZ4l/qN7/' fio; \
 "
