@@ -206,3 +206,15 @@ EXTRA_USERS_PARAMS:append = "\
   usermod -d /var/rootdirs/home/fio -m ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
+
+# Fix fio home directory ownership after creation
+# usermod -m creates the directory but may create it as root, so we need to fix ownership
+# Use UID/GID 1000:1000 which is the standard fio user ID in LmP
+fix_fio_home_ownership() {
+    if [ -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
+        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+    fi
+}
+
+ROOTFS_POSTPROCESS_COMMAND += "fix_fio_home_ownership; "
