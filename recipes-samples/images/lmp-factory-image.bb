@@ -209,12 +209,23 @@ EXTRA_USERS_PARAMS:append = "\
 
 # Fix fio home directory ownership after creation
 # usermod -m creates the directory but may create it as root, so we need to fix ownership
-# Use UID/GID 1000:1000 which is the standard fio user ID in LmP
+# Derive the actual UID/GID from the user created by EXTRA_USERS_PARAMS, not assume a fixed value
 fix_fio_home_ownership() {
     if [ -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
-        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        # Get the actual UID and GID from the passwd file in the rootfs
+        # This ensures we use the correct IDs even if LMP_USER has a different UID/GID
+        local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f3)
+        local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f4)
+        
+        if [ -n "$fio_uid" ] && [ -n "$fio_gid" ]; then
+            chown -R ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+            chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        else
+            # Fallback: use username directly (chown will look up UID/GID)
+            # This works if the user exists in the rootfs passwd file
+            chown -R ${LMP_USER}:${LMP_USER} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+            chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        fi
     fi
 }
-
 ROOTFS_POSTPROCESS_COMMAND += "fix_fio_home_ownership; "
