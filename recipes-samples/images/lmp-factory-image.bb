@@ -212,6 +212,7 @@ EXTRA_USERS_PARAMS:append = "\
 # Derive the actual UID/GID from the user created by EXTRA_USERS_PARAMS, not assume a fixed value
 # CRITICAL: This must run AFTER EXTRA_USERS_PARAMS but BEFORE any PAM configuration that might
 # recreate the directory. We also ensure the directory exists so pam_mkhomedir skips creation.
+# CRITICAL: Always use numeric UID/GID for chown since the user doesn't exist on the build host
 fix_fio_home_ownership() {
     # Ensure the directory exists (usermod -m should create it, but be defensive)
     if [ ! -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
@@ -220,22 +221,26 @@ fix_fio_home_ownership() {
     
     # Get the actual UID and GID from the passwd file in the rootfs
     # This ensures we use the correct IDs even if LMP_USER has a different UID/GID
-    local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f3)
-    local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f4)
+    # CRITICAL: Must use numeric IDs because the user doesn't exist on the build host
+    local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd 2>/dev/null | cut -d: -f3)
+    local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd 2>/dev/null | cut -d: -f4)
     
-    if [ -n "$fio_uid" ] && [ -n "$fio_gid" ]; then
+    # Validate that we got numeric IDs (should always succeed if EXTRA_USERS_PARAMS ran)
+    if [ -n "$fio_uid" ] && [ -n "$fio_gid" ] && [ "$fio_uid" -eq "$fio_uid" ] 2>/dev/null && [ "$fio_gid" -eq "$fio_gid" ] 2>/dev/null; then
         chown -R ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
         chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        # Create marker file with correct ownership
+        touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
+        chown ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
     else
-        # Fallback: use username directly (chown will look up UID/GID)
-        # This works if the user exists in the rootfs passwd file
-        chown -R ${LMP_USER}:${LMP_USER} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        # Fallback: Use default LmP fio user UID/GID (1000:1000)
+        # This should only happen if passwd file doesn't exist or user wasn't created
+        # which would indicate a more serious build problem
+        bbwarn "Could not determine ${LMP_USER} UID/GID from passwd file, using default 1000:1000"
+        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
         chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
+        chown 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
     fi
-    
-    # CRITICAL: Create a marker file to indicate the directory was created at build time
-    # This helps with debugging and ensures pam_mkhomedir sees the directory exists
-    touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
-    chown ${fio_uid:-${LMP_USER}}:${fio_gid:-${LMP_USER}} ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home 2>/dev/null || true
 }
 ROOTFS_POSTPROCESS_COMMAND += "fix_fio_home_ownership; "
