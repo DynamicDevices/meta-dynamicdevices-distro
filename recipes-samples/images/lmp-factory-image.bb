@@ -143,6 +143,12 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-sentai = " \
     stm32flash \
 "
 
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " \
+    socat \
+    default-network-manager \
+    stm32flash \
+"
+
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
        linux-firmware-iwlwifi \
        pciutils \
@@ -201,10 +207,15 @@ inherit extrausers
 # The LmP base layer creates the fio user with useradd -M (no home directory)
 # and expects pam_mkhomedir to create it at first login. This causes problems
 # when services need to write to the home directory before user login.
-# CRITICAL: Create parent directory structure before usermod -m runs
+# CRITICAL: Create directory structure BEFORE EXTRA_USERS_PARAMS runs
 # usermod -m requires the parent directory to exist, so we create it first
+# We use ROOTFS_POSTPROCESS_COMMAND:prepend to run before EXTRA_USERS_PARAMS
+create_fio_home_parent() {
+    mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
+}
+ROOTFS_POSTPROCESS_COMMAND:prepend = "create_fio_home_parent; "
+
 EXTRA_USERS_PARAMS:append = "\
-  mkdir -p /var/rootdirs/home; \
   usermod -d /var/rootdirs/home/fio -m ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
