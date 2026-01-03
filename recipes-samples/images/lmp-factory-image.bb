@@ -203,57 +203,14 @@ IMAGE_FEATURES += "ssh-server-openssh"
 # Disable root login - NOTE: This means we can't use "sudo su" any more *but* running commands as root works
 inherit extrausers
 
-# Create fio user home directory at build time
+# Create fio user with home directory at build time
 # The LmP base layer creates the fio user with useradd -M (no home directory)
 # and expects pam_mkhomedir to create it at first login. This causes problems
 # when services need to write to the home directory before user login.
-# CRITICAL: Create directory structure BEFORE EXTRA_USERS_PARAMS runs
-# usermod -m requires the parent directory to exist, so we create it first
-# We use ROOTFS_POSTPROCESS_COMMAND:prepend to run before EXTRA_USERS_PARAMS
-create_fio_home_parent() {
-    mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home
-}
-ROOTFS_POSTPROCESS_COMMAND:prepend = "create_fio_home_parent; "
-
+# Simple solution: Delete and recreate the user WITH a home directory from the start.
+# This ensures correct ownership automatically - no post-processing needed.
 EXTRA_USERS_PARAMS:append = "\
-  usermod -d /var/rootdirs/home/fio -m ${LMP_USER}; \
+  userdel -r ${LMP_USER}; \
+  useradd -d /var/rootdirs/home/fio -m -u 1000 -g 1000 ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
-
-# Fix fio home directory ownership after creation
-# usermod -m creates the directory but may create it as root, so we need to fix ownership
-# Derive the actual UID/GID from the user created by EXTRA_USERS_PARAMS, not assume a fixed value
-# CRITICAL: This must run AFTER EXTRA_USERS_PARAMS but BEFORE any PAM configuration that might
-# recreate the directory. We also ensure the directory exists so pam_mkhomedir skips creation.
-# CRITICAL: Always use numeric UID/GID for chown since the user doesn't exist on the build host
-fix_fio_home_ownership() {
-    # Ensure the directory exists (usermod -m should create it, but be defensive)
-    if [ ! -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
-        mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-    fi
-    
-    # Get the actual UID and GID from the passwd file in the rootfs
-    # This ensures we use the correct IDs even if LMP_USER has a different UID/GID
-    # CRITICAL: Must use numeric IDs because the user doesn't exist on the build host
-    local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd 2>/dev/null | cut -d: -f3)
-    local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd 2>/dev/null | cut -d: -f4)
-    
-    # Validate that we got numeric IDs (should always succeed if EXTRA_USERS_PARAMS ran)
-    if [ -n "$fio_uid" ] && [ -n "$fio_gid" ] && [ "$fio_uid" -eq "$fio_uid" ] 2>/dev/null && [ "$fio_gid" -eq "$fio_gid" ] 2>/dev/null; then
-        chown -R ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        # Create marker file with correct ownership
-        touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
-        chown ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
-    else
-        # Fallback: Use default LmP fio user UID/GID (1000:1000)
-        # This should only happen if passwd file doesn't exist or user wasn't created
-        # which would indicate a more serious build problem
-        bbwarn "Could not determine ${LMP_USER} UID/GID from passwd file, using default 1000:1000"
-        chown -R 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
-        chown 1000:1000 ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
-    fi
-}
-ROOTFS_POSTPROCESS_COMMAND += "fix_fio_home_ownership; "
