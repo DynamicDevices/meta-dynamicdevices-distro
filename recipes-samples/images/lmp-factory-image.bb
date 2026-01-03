@@ -203,15 +203,12 @@ IMAGE_FEATURES += "ssh-server-openssh"
 # Disable root login - NOTE: This means we can't use "sudo su" any more *but* running commands as root works
 inherit extrausers
 
-# Create fio user with home directory at build time
-# The LmP base layer creates the fio user with useradd -M (no home directory)
-# and expects pam_mkhomedir to create it at first login. This causes problems
-# when services need to write to the home directory before user login.
-# Simple solution: Delete and recreate the user WITH a home directory from the start.
-# This ensures correct ownership automatically - no post-processing needed.
-# Use -f flag on userdel to force deletion even if user is logged in or has processes
-EXTRA_USERS_PARAMS:append = "\
-  userdel -f -r ${LMP_USER} || true; \
-  useradd -d /var/rootdirs/home/fio -m -u 1000 -g 1000 ${LMP_USER}; \
+# Create fio user with home directory at build time (override the LmP setting)
+# LmP creates user with useradd -M (no home), we override to use -m (with home)
+# Specify -d to set custom home directory path using ${LMP_USER} variable
+EXTRA_USERS_PARAMS = "\
+  groupadd ${LMP_USER}; \
+  useradd -d /var/rootdirs/home/${LMP_USER} -m -p '${LMP_PASSWORD}' ${LMP_USER}; \
+  usermod -a -G sudo,users,audio,plugdev ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
