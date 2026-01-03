@@ -90,4 +90,4 @@ FILES:${PN} = " \
 PROVIDES = "cra-compliance-audit"
 
 # Compatible with all Dynamic Devices machines using Foundries.io
-COMPATIBLE_MACHINE = "imx93-jaguar-eink|imx8mm-jaguar-sentai|imx8mm-jaguar-phasora|imx8mm-jaguar-inst|imx8mm-jaguar-handheld"
+COMPATIBLE_MACHINE = "imx93-jaguar-eink|imx8mm-jaguar-sentai|imx8mm-jaguar-dt510|imx8mm-jaguar-phasora|imx8mm-jaguar-inst|imx8mm-jaguar-handheld"

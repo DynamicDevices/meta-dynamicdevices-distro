@@ -41,6 +41,18 @@ EXTRA_OEMAKE:append:imx8mm-jaguar-sentai = " \
     ${@'CFG_NXP_SE05X=n CFG_CORE_SE05X=n CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n' if d.getVar('DISTRO') == 'lmp-mfgtool' else ''} \
 "
 
+# Restore working SE05X configuration from commit 9838eb8
+EXTRA_OEMAKE:append:imx8mm-jaguar-dt510 = " \
+    ${@bb.utils.contains('MACHINE_FEATURES', 'se05x', \
+        'CFG_IMX_I2C=y CFG_CORE_SE05X=y CFG_NXP_SE05X_RNG_DRV=n CFG_NXP_CAAM_RSA_DRV=n CFG_NUM_THREADS=1 CFG_CORE_SE05X_DISPLAY_INFO=n CFG_CORE_SE05X_I2C_BUS=3 CFG_CORE_SE05X_SCP03_EARLY=y CFG_CORE_SE05X_SCP03_PROVISION_ON_INIT=n CFG_CORE_SE05X_SCP03_PROVISION=y CFG_CORE_SE05X_INIT_NVM=n CFG_CORE_SE05X_OEFID=0xA200', \
+        '', d)} \
+"
+
+# Override SE050 settings specifically for mfgtool builds
+EXTRA_OEMAKE:append:imx8mm-jaguar-dt510 = " \
+    ${@'CFG_NXP_SE05X=n CFG_CORE_SE05X=n CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n' if d.getVar('DISTRO') == 'lmp-mfgtool' else ''} \
+"
+
 # imx93-jaguar-eink uses internal EdgeLock Secure Enclave (ELE), not external SE050
 # For mfgtools (manufacturing/programming), disable ELE to avoid initialization issues
 # ELE is only needed for production runtime, not for UUU programming operations
