@@ -201,8 +201,10 @@ inherit extrausers
 # The LmP base layer creates the fio user with useradd -M (no home directory)
 # and expects pam_mkhomedir to create it at first login. This causes problems
 # when services need to write to the home directory before user login.
-# This usermod command sets the home directory path and creates it at build time.
+# CRITICAL: Create parent directory structure before usermod -m runs
+# usermod -m requires the parent directory to exist, so we create it first
 EXTRA_USERS_PARAMS:append = "\
+  mkdir -p /var/rootdirs/home; \
   usermod -d /var/rootdirs/home/fio -m ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
