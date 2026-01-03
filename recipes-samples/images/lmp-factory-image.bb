@@ -209,8 +209,9 @@ inherit extrausers
 # when services need to write to the home directory before user login.
 # Simple solution: Delete and recreate the user WITH a home directory from the start.
 # This ensures correct ownership automatically - no post-processing needed.
+# Use -f flag on userdel to force deletion even if user is logged in or has processes
 EXTRA_USERS_PARAMS:append = "\
-  userdel -r ${LMP_USER}; \
+  userdel -f -r ${LMP_USER} || true; \
   useradd -d /var/rootdirs/home/fio -m -u 1000 -g 1000 ${LMP_USER}; \
   usermod -s /sbin/nologin root; \
 "
