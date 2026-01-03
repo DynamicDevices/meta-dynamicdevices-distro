@@ -210,22 +210,32 @@ EXTRA_USERS_PARAMS:append = "\
 # Fix fio home directory ownership after creation
 # usermod -m creates the directory but may create it as root, so we need to fix ownership
 # Derive the actual UID/GID from the user created by EXTRA_USERS_PARAMS, not assume a fixed value
+# CRITICAL: This must run AFTER EXTRA_USERS_PARAMS but BEFORE any PAM configuration that might
+# recreate the directory. We also ensure the directory exists so pam_mkhomedir skips creation.
 fix_fio_home_ownership() {
-    if [ -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
-        # Get the actual UID and GID from the passwd file in the rootfs
-        # This ensures we use the correct IDs even if LMP_USER has a different UID/GID
-        local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f3)
-        local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f4)
-        
-        if [ -n "$fio_uid" ] && [ -n "$fio_gid" ]; then
-            chown -R ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-            chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        else
-            # Fallback: use username directly (chown will look up UID/GID)
-            # This works if the user exists in the rootfs passwd file
-            chown -R ${LMP_USER}:${LMP_USER} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-            chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
-        fi
+    # Ensure the directory exists (usermod -m should create it, but be defensive)
+    if [ ! -d ${IMAGE_ROOTFS}/var/rootdirs/home/fio ]; then
+        mkdir -p ${IMAGE_ROOTFS}/var/rootdirs/home/fio
     fi
+    
+    # Get the actual UID and GID from the passwd file in the rootfs
+    # This ensures we use the correct IDs even if LMP_USER has a different UID/GID
+    local fio_uid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f3)
+    local fio_gid=$(grep "^${LMP_USER}:" ${IMAGE_ROOTFS}/etc/passwd | cut -d: -f4)
+    
+    if [ -n "$fio_uid" ] && [ -n "$fio_gid" ]; then
+        chown -R ${fio_uid}:${fio_gid} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+    else
+        # Fallback: use username directly (chown will look up UID/GID)
+        # This works if the user exists in the rootfs passwd file
+        chown -R ${LMP_USER}:${LMP_USER} ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+        chmod 755 ${IMAGE_ROOTFS}/var/rootdirs/home/fio
+    fi
+    
+    # CRITICAL: Create a marker file to indicate the directory was created at build time
+    # This helps with debugging and ensures pam_mkhomedir sees the directory exists
+    touch ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home
+    chown ${fio_uid:-${LMP_USER}}:${fio_gid:-${LMP_USER}} ${IMAGE_ROOTFS}/var/rootdirs/home/fio/.build-time-home 2>/dev/null || true
 }
 ROOTFS_POSTPROCESS_COMMAND += "fix_fio_home_ownership; "
