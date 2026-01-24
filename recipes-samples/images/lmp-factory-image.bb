@@ -26,6 +26,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'recipes-samples/i
 # Enable improv protocol (BLE/serial onboarding) recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'improv', 'recipes-samples/images/lmp-feature-improv.inc', '', d)}
 
+# Enable USB gadget scripts if usbgadget DISTRO_FEATURES is enabled
+require ${@bb.utils.contains('DISTRO_FEATURES', 'usbgadget', 'recipes-samples/images/lmp-feature-usbgadget.inc', '', d)}
+
 # Enable flutter related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/images/lmp-feature-flutter.inc', '', d)}
 
