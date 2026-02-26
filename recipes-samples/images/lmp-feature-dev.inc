@@ -1,3 +1,5 @@
+# alsa-utils (aplay, arecord) for USB audio gadget testing on DT510
+CORE_IMAGE_BASE_INSTALL += "${@bb.utils.contains('DISTRO_FEATURES', 'alsa', 'alsa-utils', '', d)}"
 CORE_IMAGE_BASE_INSTALL += " \
    libgpiod libgpiod-tools libgpiod-dev \
    evtest \
