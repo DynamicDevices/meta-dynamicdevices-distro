@@ -150,6 +150,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " \
     socat \
     default-network-manager \
     stm32flash \
+    alsa-utils \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
