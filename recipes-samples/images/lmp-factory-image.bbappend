@@ -1,2 +1,2 @@
-# Dev / bring-up packages for factory image — definitions in conf/lmp-feature-dev.inc
-require conf/lmp-feature-dev.inc
+# MDIO/PHY bring-up (DT510, KSZ9896) — meta-networking: phytool, mdio-tools
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " phytool mdio-tools"

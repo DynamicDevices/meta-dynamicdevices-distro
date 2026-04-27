@@ -1,0 +1,40 @@
+[Unit]
+Description=CRA Audit Event Monitor for EU Cyber Resilience Act Compliance
+Documentation=man:cra-audit-handler.sh(1)
+Wants=network-online.target
+After=network-online.target aktualizr-lite.service
+ConditionPathExists=/var/sota/sota.toml
+PartOf=cra-compliance.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/default/cra-audit
+ExecStart=/usr/bin/cra-audit-handler.sh monitor
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cra-audit-monitor
+
+# Restart policy for continuous monitoring
+Restart=always
+RestartSec=30
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+# Security settings appropriate for audit monitoring
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/sota /tmp
+ProtectHome=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits for audit monitoring
+MemoryMax=64M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target
+Also=cra-audit-queue-processor.timer
