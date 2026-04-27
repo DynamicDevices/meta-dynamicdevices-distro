@@ -19,6 +19,8 @@ CORE_IMAGE_BASE_INSTALL += " \
    pv \
    sysstat \
    ser2net \
+   phytool \
+   mdio-tools \
 "
-# MDIO/PHY bring-up: KSZ9896 (FEC MDIO) — only where this dev set is used (debug-tweaks)
-CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " phytool mdio-tools"
+# lmp-factory-image.bb: this inc is only required when IMAGE_FEATURES contains debug-tweaks
+# (e.g. DEV_MODE), so the packages above including phytool/mdio apply to any such image.
