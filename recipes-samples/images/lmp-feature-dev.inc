@@ -20,3 +20,5 @@ CORE_IMAGE_BASE_INSTALL += " \
    sysstat \
    ser2net \
 "
+# MDIO/PHY bring-up: KSZ9896 (FEC MDIO) — only where this dev set is used (debug-tweaks)
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " phytool mdio-tools"
