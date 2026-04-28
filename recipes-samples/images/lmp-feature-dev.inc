@@ -1,6 +1,7 @@
 # alsa-utils (aplay, arecord) for USB audio gadget testing on DT510
 CORE_IMAGE_BASE_INSTALL += "${@bb.utils.contains('DISTRO_FEATURES', 'alsa', 'alsa-utils', '', d)}"
-# imx-memtool: NXP memtool only (imx-test/test/memtool), no full imx-test2 suite — ${bindir}/memtool for MMIO peek/poke (e.g. FEC @ 0x30be0000).
+# imx-memtool: NXP memtool (imx-test/test/memtool), ${bindir}/memtool — named registers / modules.
+# devmem2: tiny arbitrary physical MMIO read/write via /dev/mem (ADDRESS [w|h|b [VALUE]]).
 CORE_IMAGE_BASE_INSTALL += " \
    libgpiod libgpiod-tools libgpiod-dev \
    evtest \
@@ -22,7 +23,8 @@ CORE_IMAGE_BASE_INSTALL += " \
    ser2net \
    phytool \
    mdio-tools \
-   imx-test2 \
+   imx-memtool \
+   devmem2 \
 "
 # lmp-factory-image.bb: this inc is only required when IMAGE_FEATURES contains debug-tweaks
-# (e.g. DEV_MODE), so the packages above including phytool/mdio/imx-memtool apply to any such image.
+# (e.g. DEV_MODE), so the packages above including phytool/mdio/imx-memtool/devmem2 apply to any such image.
