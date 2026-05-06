@@ -1,0 +1,3 @@
+# Static UID for meta-oe pipewire (USERADD_PACKAGES = "${PN}", --system pipewire).
+# UID/GID 966: free slot between lower system IDs and teeclnt (967) in meta-lmp lmp-passwd-table / lmp-group-table.
+pipewire:x:966:966:PipeWire multimedia daemon:/:/sbin/nologin

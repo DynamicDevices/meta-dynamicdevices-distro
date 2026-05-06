@@ -1,0 +1,2 @@
+# Static GID for pipewire primary group (must match passwd line above).
+pipewire:x:966:
