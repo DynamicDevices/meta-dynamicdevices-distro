@@ -5,7 +5,7 @@ BlueZ monitor exposes BAP unicast + broadcast roles (NXP UM12155). Replace or ex
 LE Audio release / validated BlueZ build. See lmp-feature-le-audio.inc."
 
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2ffb40327"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "file://51-bluez-imx-le-audio.conf"
 
