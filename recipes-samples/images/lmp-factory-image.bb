@@ -65,6 +65,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'bgt60', 'recipes-samples/image
 # Enable NXP IW612 related recipes if required by MACHINE
 require ${@bb.utils.contains('MACHINE_FEATURES', 'nxpiw612-sdio', 'recipes-samples/images/lmp-feature-iw612.inc', '', d)}
 
+# LE Audio / Auracast (BAP broadcast) — optional; requires IW612 stack (nxpiw612-sdio) in practice
+require ${@bb.utils.contains('MACHINE_FEATURES', 'auracast', 'recipes-samples/images/lmp-feature-le-audio.inc', '', d)}
+
 # Enable Renesas upd72020x related recipes if required by MACHINE
 require ${@bb.utils.contains('MACHINE_FEATURES', 'upd72020x', 'recipes-samples/images/lmp-feature-upd72020x.inc', '', d)}
 
