@@ -18,6 +18,7 @@ CORE_IMAGE_BASE_INSTALL += " \
     pipewire-alsa \
     wireplumber \
     bluez5 \
-    bluez5-testtools \
     le-audio-wireplumber-config \
 "
+
+# bluez5-testtools: installed only with IW612 + development images — see lmp-feature-iw612.inc (debug-tweaks).
