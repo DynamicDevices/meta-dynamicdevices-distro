@@ -154,6 +154,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-dt510 = " \
     default-network-manager \
     stm32flash \
     alsa-utils \
+    dt510-audio-init \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
