@@ -2,6 +2,7 @@ SUMMARY = "Minimal factory image which includes OTA Lite, Docker and optional de
 DESCRIPTION = "Factory image for Dynamic Devices edge computing platforms with OTA capabilities, Docker containers and optional development tools"
 
 LICENSE = "MIT"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 require recipes-samples/images/lmp-image-common.inc
 
