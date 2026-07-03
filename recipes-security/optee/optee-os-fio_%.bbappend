@@ -41,16 +41,20 @@ EXTRA_OEMAKE:append:imx8mm-jaguar-sentai = " \
     ${@'CFG_NXP_SE05X=n CFG_CORE_SE05X=n CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n' if d.getVar('DISTRO') == 'lmp-mfgtool' else ''} \
 "
 
-# Restore working SE05X configuration from commit 9838eb8
+# Restore working SE05X configuration from commit 9838eb8.
+# DT510 also enables OP-TEE RPMB-backed rollback protection for REE FS secure
+# storage so normal-world PKCS/secure-storage users do not boot with the
+# insecure monotonic-counter fallback warning. Keep RPMB write-key programming
+# out of normal images; factory enrollment must remain an explicit step.
 EXTRA_OEMAKE:append:imx8mm-jaguar-dt510 = " \
     ${@bb.utils.contains('MACHINE_FEATURES', 'se05x', \
-        'CFG_IMX_I2C=y CFG_CORE_SE05X=y CFG_NXP_SE05X_RNG_DRV=n CFG_NXP_CAAM_RSA_DRV=n CFG_NUM_THREADS=1 CFG_CORE_SE05X_DISPLAY_INFO=n CFG_CORE_SE05X_I2C_BUS=3 CFG_CORE_SE05X_SCP03_EARLY=y CFG_CORE_SE05X_SCP03_PROVISION_ON_INIT=n CFG_CORE_SE05X_SCP03_PROVISION=y CFG_CORE_SE05X_INIT_NVM=n CFG_CORE_SE05X_OEFID=0xA200', \
+        'CFG_IMX_I2C=y CFG_CORE_SE05X=y CFG_NXP_SE05X_RNG_DRV=n CFG_NXP_CAAM_RSA_DRV=n CFG_NUM_THREADS=1 CFG_CORE_SE05X_DISPLAY_INFO=n CFG_CORE_SE05X_I2C_BUS=3 CFG_CORE_SE05X_SCP03_EARLY=y CFG_CORE_SE05X_SCP03_PROVISION_ON_INIT=n CFG_CORE_SE05X_SCP03_PROVISION=y CFG_CORE_SE05X_INIT_NVM=n CFG_CORE_SE05X_OEFID=0xA200 CFG_RPMB_FS=y CFG_REE_FS_INTEGRITY_RPMB=y CFG_RPMB_FS_DEV_ID=2', \
         '', d)} \
 "
 
 # Override SE050 settings specifically for mfgtool builds
 EXTRA_OEMAKE:append:imx8mm-jaguar-dt510 = " \
-    ${@'CFG_NXP_SE05X=n CFG_CORE_SE05X=n CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n' if d.getVar('DISTRO') == 'lmp-mfgtool' else ''} \
+    ${@'CFG_NXP_SE05X=n CFG_CORE_SE05X=n CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n CFG_RPMB_FS=n CFG_REE_FS_INTEGRITY_RPMB=n' if d.getVar('DISTRO') == 'lmp-mfgtool' else ''} \
 "
 
 # imx93-jaguar-eink uses internal EdgeLock Secure Enclave (ELE), not external SE050
