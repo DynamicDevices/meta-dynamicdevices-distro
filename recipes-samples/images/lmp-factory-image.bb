@@ -84,6 +84,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/ima
 # Enable XM125 radar support if provided by machine
 require ${@bb.utils.contains('MACHINE_FEATURES', 'xm125-radar', 'recipes-samples/images/lmp-feature-xm125-radar.inc', '', d)}
 
+# u-blox NEO-M9V GNSS host tools (ubxtool / gpsd clients)
+require ${@bb.utils.contains('MACHINE_FEATURES', 'neo-m9v', 'recipes-samples/images/lmp-feature-neo-m9v.inc', '', d)}
+
 # E-Ink Spectra 6 EL133UF1 display support
 # Note: eink-spectra6 support is provided by meta-subscriber-overrides (private repository)
 
