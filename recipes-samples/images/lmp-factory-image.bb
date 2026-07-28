@@ -17,6 +17,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'waydroid', 'recipes-samples/ima
 # Enable auto register related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'auto-register', 'recipes-samples/images/lmp-feature-auto-register.inc', '', d)}
 
+# AESL self-hosted Foundries OTA (DISTRO=lmp-dynamicdevices-aesl) — not vixdt SaaS
+require ${@bb.utils.contains('DISTRO_FEATURES', 'aesl-ota', 'recipes-samples/images/lmp-feature-aesl-ota.inc', '', d)}
+
 # Enable alsa related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'alsa', 'recipes-samples/images/lmp-feature-alsa.inc', '', d)}
 
