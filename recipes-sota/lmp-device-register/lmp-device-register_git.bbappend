@@ -3,7 +3,7 @@
 #
 # Lab reference:
 #   https://github.com/active-esl/factory-aesl-lab-meta-subscriber-overrides
-#   DEVICE_API=https://ota.dynamicdevices.co.uk/v1/devices/
+#   DEVICE_API=https://ota.active-esl.com/v1/devices/
 #
 # This file intentionally left without LMP_DEVICE_API overrides so SaaS and
 # multi-factory builds do not bake a single shared portal URL.
