@@ -9,3 +9,9 @@ SRCREV:aesl-ota = "07a5b14b2e55f6882f7323ad6a32e62438aa5098"
 # hits cmd/link "duplicated definition of symbol …reporterImpl…Stop.func1"
 # (golang/go#64801). Build statically for aesl-ota only.
 GO_LINKSHARED:aesl-ota = ""
+
+# Upstream ships debian/ packaging next to Go sources; go-mod installs that
+# tree into composectl-dev and file-rdeps QA fails on debian/rules → make.
+do_install:append:aesl-ota() {
+    rm -rf ${D}${libdir}/go/src/${GO_IMPORT}/debian
+}
