@@ -4,3 +4,8 @@
 
 SRCBRANCH:aesl-ota = "main"
 SRCREV:aesl-ota = "07a5b14b2e55f6882f7323ad6a32e62438aa5098"
+
+# v96.3.0 uses Go generics in internal/progress; Yocto go-mod -linkshared
+# hits cmd/link "duplicated definition of symbol …reporterImpl…Stop.func1"
+# (golang/go#64801). Build statically for aesl-ota only.
+GO_LINKSHARED:aesl-ota = ""
