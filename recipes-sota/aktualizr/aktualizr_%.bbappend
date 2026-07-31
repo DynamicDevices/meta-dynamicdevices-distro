@@ -5,10 +5,12 @@
 # Evidence: COMPOSE_APPS_PROXY only on foundriesio/aktualizr-lite branch v97
 # (not on v95/v96 tips as of 2026-07-28).
 #
-# Use :aesl-ota (not :lmp:aesl-ota). Chained :lmp:aesl-ota did not override
-# meta-lmp BRANCH:lmp/SRCREV:lmp in bitbake -e (stayed on v95 / 6cda15b);
-# :aesl-ota wins because aesl-ota appears after lmp in OVERRIDES — same
-# pattern as composectl_git.bbappend SRCBRANCH:aesl-ota.
+# Must live under recipes-sota/aktualizr/ — layer.conf BBFILES is
+# recipes-*/*/*.bbappend (two path components). A top-level
+# recipes-sota/aktualizr_%.bbappend was never parsed.
+#
+# Prefer :aesl-ota (not :lmp:aesl-ota) so aesl-ota wins over meta-lmp
+# BRANCH:lmp via OVERRIDES order — same pattern as composectl.
 
 BRANCH:aesl-ota = "v97"
 SRCREV:aesl-ota = "2362e88f8b105b32cf871505082bdf3ed242009c"
