@@ -169,6 +169,11 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-inst = " \
        pciutils \
        socat \
 "
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
+       linux-firmware-iwlwifi \
+       pciutils \
+       socat \
+"
 
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libpng \
