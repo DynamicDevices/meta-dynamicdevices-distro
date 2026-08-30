@@ -17,7 +17,7 @@ EXTRA_OEMAKE:append:imx8mm-jaguar-dt510 = " \
 # Sentai / inst / eink: programming path historically without SE050 early init.
 # Full stack unwind + restore CAAM crypto (se05x.inc removes CFG_CRYPTO_DRIVER=y).
 python() {
-    machines = ("imx8mm-jaguar-sentai", "imx8mm-jaguar-inst", "imx93-jaguar-eink")
+    machines = ("imx8mm-jaguar-sentai", "imx8mm-jaguar-inst", "imx8mm-jaguar-screen", "imx93-jaguar-eink")
     machine = d.getVar("MACHINE") or ""
     if machine not in machines:
         return
@@ -38,6 +38,16 @@ EXTRA_OEMAKE:append:imx8mm-jaguar-sentai = " \
 "
 
 EXTRA_OEMAKE:append:imx8mm-jaguar-inst = " \
+    CFG_NXP_SE05X=n CFG_CORE_SE05X=n \
+    CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n \
+    CFG_CRYPTO_DRV_CIPHER=n CFG_CRYPTO_DRV_ACIPHER=n \
+    CFG_NXP_SE05X_SCP03_DRV=n CFG_NXP_SE05X_APDU_DRV=n \
+    CFG_NXP_SE05X_RSA_DRV=n CFG_NXP_SE05X_RSA_DRV_FALLBACK=n \
+    CFG_NXP_SE05X_ECC_DRV=n CFG_NXP_SE05X_ECC_DRV_FALLBACK=n \
+    CFG_NXP_SE05X_DIEID_DRV=n \
+    CFG_CRYPTO_DRIVER=y \
+"
+EXTRA_OEMAKE:append:imx8mm-jaguar-screen = " \
     CFG_NXP_SE05X=n CFG_CORE_SE05X=n \
     CFG_CORE_SE05X_SCP03_EARLY=n CFG_CORE_SE05X_EARLY_INIT=n \
     CFG_CRYPTO_DRV_CIPHER=n CFG_CRYPTO_DRV_ACIPHER=n \
