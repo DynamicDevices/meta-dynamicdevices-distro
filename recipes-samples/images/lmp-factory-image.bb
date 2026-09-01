@@ -178,6 +178,23 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
        socat \
 "
 
+# The DSI panel and FT5626 controller both expose native portrait coordinates.
+# Declare that geometry explicitly so Weston does not inherit an HDMI-oriented
+# default and so libinput can bind the touchscreen to the correct output.
+configure_jaguar_screen_weston() {
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'true', 'false', d)}; then
+        install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
+        cat >> ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston.ini <<'EOF'
+
+[output]
+name=DSI-1
+mode=1200x1920
+transform=normal
+EOF
+    fi
+}
+ROOTFS_POSTPROCESS_COMMAND:append:imx8mm-jaguar-screen = " configure_jaguar_screen_weston;"
+
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libpng \
        rng-tools \
