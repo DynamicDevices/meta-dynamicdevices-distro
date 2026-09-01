@@ -1,0 +1,13 @@
+[Unit]
+Description=Jaguar Screen Flutter display and touch proof
+After=weston.service weston@root.service systemd-user-sessions.service
+ConditionPathExists=/dev/dri/card0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/screen-flutter-demo
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

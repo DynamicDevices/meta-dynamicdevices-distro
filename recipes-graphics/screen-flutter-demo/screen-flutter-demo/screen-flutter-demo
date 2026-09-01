@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+
+attempt=0
+
+find_bundle() {
+    for candidate in /usr/share/flutter/ivi-homescreen-multi-touch-test/*/release; do
+        [ -f "$candidate/lib/libapp.so" ] || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done
+    return 1
+}
+
+bundle=$(find_bundle) || {
+    echo "Flutter multi-touch test bundle is not installed" >&2
+    exit 1
+}
+
+while [ "$attempt" -lt 30 ]; do
+    for socket in /run/user/*/wayland-*; do
+        [ -S "$socket" ] || continue
+        runtime_dir=${socket%/*}
+        display=${socket##*/}
+        export XDG_RUNTIME_DIR="$runtime_dir"
+        export WAYLAND_DISPLAY="$display"
+        export LC_ALL=C.UTF-8
+        # Replacing the shell keeps systemd restart and signal handling tied to
+        # the actual Flutter embedder process.
+        # shellcheck disable=SC2093
+        exec /usr/bin/homescreen -b "$bundle" -f -disable-cursor
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available" >&2
+exit 1
