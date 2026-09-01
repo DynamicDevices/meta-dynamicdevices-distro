@@ -186,6 +186,7 @@ SRC_URI:remove = "https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plug
                    file://0004-opencv-resolve-missing-opencv-data-dir-in-yocto-buil.patch \
                    "
 SRC_URI:prepend = "${GST1.0-PLUGINS-BAD_SRC};branch=${SRCBRANCH} "
+SRC_URI:append = " file://0001-waylandsink-fix-runtime-rank-registration.patch"
 GST1.0-PLUGINS-BAD_SRC ?= "gitsm://github.com/nxp-imx/gst-plugins-bad.git;protocol=https"
 SRCBRANCH = "MM_04.10.0_2505_L6.12.20"
 SRCREV = "4320364e6be53cae81ac2bca3ce0e09cf8707590"

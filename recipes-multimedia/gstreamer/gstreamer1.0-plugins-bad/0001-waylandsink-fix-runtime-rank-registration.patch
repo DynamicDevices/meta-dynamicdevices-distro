@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Dynamic Devices <opensource@dynamicdevices.co.uk>
+Date: Mon, 1 Sep 2026 16:40:00 +0100
+Subject: [PATCH] waylandsink: fix runtime rank registration
+
+GST_ELEMENT_REGISTER_DEFINE expands to a function definition and therefore
+cannot be used inside plugin_init.  The NXP fork moved it into plugin_init so
+that the rank could be selected at runtime, which Clang correctly rejects.
+
+Register the element directly instead.  This preserves the NXP runtime rank
+selection without defining a function inside another function.
+
+Upstream-Status: Pending
+Signed-off-by: Dynamic Devices <opensource@dynamicdevices.co.uk>
+---
+ ext/wayland/gstwaylandsink.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/ext/wayland/gstwaylandsink.c b/ext/wayland/gstwaylandsink.c
+index 2158cfcaa3..e69cb14fc8 100644
+--- a/ext/wayland/gstwaylandsink.c
++++ b/ext/wayland/gstwaylandsink.c
+@@ -1495,10 +1495,8 @@ plugin_init (GstPlugin * plugin)
+   if (imx_chip_code() >= CC_MX8)
+       rank = IMX_GST_PLUGIN_RANK + 1;
+ 
+-  GST_ELEMENT_REGISTER_DEFINE (waylandsink, "waylandsink", rank,
+-    GST_TYPE_WAYLAND_SINK);
+-
+-  return GST_ELEMENT_REGISTER (waylandsink, plugin);
++  return gst_element_register (plugin, "waylandsink", rank,
++      GST_TYPE_WAYLAND_SINK);
+ }
+ 
+ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
+-- 
+2.43.0
