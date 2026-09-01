@@ -1,0 +1,10 @@
+; Godot Engine project configuration file.
+config_version=5
+
+[application]
+config/name="Jaguar Screen Runtime Smoke"
+run/main_scene="res://smoke.tscn"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
