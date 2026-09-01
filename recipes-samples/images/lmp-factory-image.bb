@@ -81,6 +81,9 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
+# Enable GPU/VPU-facing GStreamer support on machines with an active screen
+require ${@bb.utils.contains('MACHINE_FEATURES', 'display-multimedia', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
+
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
 
