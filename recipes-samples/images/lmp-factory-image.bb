@@ -36,6 +36,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'usbgadget', 'recipes-samples/im
 # Enable flutter related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/images/lmp-feature-flutter.inc', '', d)}
 
+# Enable Godot related recipes if required by DISTRO
+require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
+
 # Enable OP-TEE related recipes if provided by the image
 require ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'recipes-samples/images/lmp-feature-optee.inc', '', d)}
 

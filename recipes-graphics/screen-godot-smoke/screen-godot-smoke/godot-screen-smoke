@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+
+exec /usr/bin/godot --headless --path /usr/share/godot-screen-smoke --quit-after 10
