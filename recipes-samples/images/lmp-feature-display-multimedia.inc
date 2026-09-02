@@ -15,11 +15,14 @@ CORE_IMAGE_BASE_INSTALL += " \
     ${MACHINE_GSTREAMER_1_0_PLUGIN} \
 "
 
-# Screen-specific display policy: native portrait output, accelerated G2D
-# Weston, persistent runtime directory, branded background and GPU access.
+# Screen-specific display policy: retain the panel's native DRM mode and apply
+# the machine-selected physical mounting transform in Weston.  This gives all
+# Wayland clients one correctly oriented logical output without application
+# rotation workarounds.  Weston remains G2D accelerated, with a persistent
+# runtime directory, branded background and GPU access.
 configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
-    cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
+    cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<EOF
 [core]
 use-g2d=true
 repaint-window=16
@@ -37,7 +40,7 @@ touchscreen_calibrator=true
 [output]
 name=DSI-1
 mode=1200x1920
-transform=normal
+transform=${DISPLAY_WESTON_TRANSFORM}
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
