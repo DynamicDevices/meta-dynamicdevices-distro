@@ -8,7 +8,9 @@
 [![YP Compliance Ready](https://img.shields.io/badge/YP%20Compliance-Distro%20Ready-blue)](https://docs.yoctoproject.org/test-manual/yocto-project-compatible.html)
 [![Distro Layer Validation](https://github.com/DynamicDevices/meta-dynamicdevices-distro/actions/workflows/distro-layer-validation.yml/badge.svg)](https://github.com/DynamicDevices/meta-dynamicdevices-distro/actions/workflows/distro-layer-validation.yml)
 
-Distribution layer for Dynamic Devices Edge Computing platforms, providing custom Linux microPlatform (LmP) distributions with specialized features and configurations.
+Distribution layer for Dynamic Devices Edge Computing platforms, providing a
+canonical Linux microPlatform (LmP) distribution with composable product
+features.
 
 ## Overview
 
@@ -19,7 +21,8 @@ This layer provides distribution configurations that extend the standard Linux m
 - **Device auto-registration** - Automatic device onboarding and management
 - **Platform-specific optimizations** - Audio, connectivity, and power management features
 - **Commercial license support** - For proprietary components and applications
-- **Multiple distribution variants** - Base, Flutter, Waydroid configurations
+- **Composable product software** - Headless by default, with explicit Flutter,
+  display, audio and Android-container feature bundles
 
 ## Documentation & Support
 
@@ -46,21 +49,12 @@ Base distribution with core Dynamic Devices features:
 - Commercial license support
 - Platform-specific optimizations
 
-### `lmp-dynamicdevices-headless`
-Headless distribution optimized for embedded applications:
-- No GUI frameworks (Wayland, X11, PulseAudio removed)
-- CRA compliance system for regulatory requirements
-- Enhanced security configurations
-- Minimal resource footprint
-
 ### `lmp-dynamicdevices-base`
-Minimal base distribution for embedded applications
+Minimal base distribution retained for configurations that need its separate
+factory/updater policy.
 
-### `lmp-dynamicdevices-flutter`
-Distribution with Flutter/Dart runtime support for modern UI applications
-
-### `lmp-dynamicdevices-waydroid`
-Distribution with Android container support via Waydroid
+The old `headless`, `flutter`, `waydroid`, and `headless-waydroid` distro names
+are migration-only compatibility inputs. Do not use them for new products.
 
 ## Yocto Project Compatibility
 
