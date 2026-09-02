@@ -1,0 +1,19 @@
+[Unit]
+Description=Jaguar Screen aero pressure digital-twin demo
+After=weston.service systemd-user-sessions.service
+Wants=weston.service
+ConditionPathExists=/dev/dri/card0
+Conflicts=screen-flutter-demo.service
+
+[Service]
+Type=simple
+User=weston
+Group=weston
+SupplementaryGroups=render video input
+StateDirectory=screen-aero-demo
+ExecStart=/usr/bin/screen-aero-demo
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
