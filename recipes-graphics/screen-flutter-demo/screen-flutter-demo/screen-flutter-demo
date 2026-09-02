@@ -24,11 +24,11 @@ while [ "$attempt" -lt 30 ]; do
         display=${socket##*/}
         export XDG_RUNTIME_DIR="$runtime_dir"
         export WAYLAND_DISPLAY="$display"
-        export LC_ALL=C.UTF-8
+        export LC_ALL=C
         # Replacing the shell keeps systemd restart and signal handling tied to
         # the actual Flutter embedder process.
         # shellcheck disable=SC2093
-        exec /usr/bin/homescreen -b "$bundle" -f -disable-cursor
+        exec /usr/bin/homescreen -b "$bundle" -f --disable-cursor
     done
     attempt=$((attempt + 1))
     sleep 1
