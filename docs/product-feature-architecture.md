@@ -50,7 +50,7 @@ DD_PRODUCT_FEATURES = "improv android-container"
 
 Feature bundles expand prerequisites centrally. In particular,
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
-`pulseaudio`, and `alsa`. Factory configuration must use the stable
+`vulkan`, `pulseaudio`, and `alsa`. Factory configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
 Runtime payloads are owned by provider-neutral packagegroups:
