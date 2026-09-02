@@ -73,9 +73,9 @@ The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is
 migrated. Wayland remains provided by the upstream LmP Wayland feature hook.
 
-Unknown feature names are fatal at parse time. Hardware compatibility checks
-will be added as machines acquire explicit capability declarations; until then,
-the existing recipe `COMPATIBLE_MACHINE` checks remain authoritative.
+Unknown feature names are fatal at parse time. Display, Flutter and Godot
+selection is also fatal unless the machine declares `display-multimedia`;
+recipe `COMPATIBLE_MACHINE` checks remain the final provider-level guard.
 
 `imx8mm-jaguar-screen` intentionally has no `improv` feature: the product has
 no working Bluetooth onboarding path. Do not infer onboarding protocols from
@@ -101,6 +101,11 @@ The following are compatibility inputs during migration, not the target model:
 - `lmp-dynamicdevices-waydroid`
 - `lmp-dynamicdevices-headless-waydroid`
 
-`lmp-dynamicdevices-base` and `lmp-dynamicdevices-aesl` need separate review:
-they also encode updater/factory policy, so they must not be mechanically
-collapsed with UI variants.
+`lmp-dynamicdevices-aesl` remains a policy overlay for the self-hosted updater,
+but now inherits `lmp-dynamicdevices`; its multi-machine Factory Definition
+passes product features per machine. `lmp-dynamicdevices-base` remains outside
+the UI-variant retirement because it has a different image-policy role.
+
+Retirement is deliberately the final rollout step. Keep the aliases until the
+layer, Foundries Factory Definition, AESL runner and manifest pins have been
+published together and hardware validation has passed.
