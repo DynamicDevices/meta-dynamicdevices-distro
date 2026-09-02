@@ -34,6 +34,10 @@ The wiki includes:
 
 ## Supported Distributions
 
+New product configurations should use the canonical `lmp-dynamicdevices`
+distro and select optional software with `DD_PRODUCT_FEATURES`. See
+[`docs/product-feature-architecture.md`](docs/product-feature-architecture.md).
+
 ### `lmp-dynamicdevices`
 Base distribution with core Dynamic Devices features:
 - Security hardening (no zeroconf)
