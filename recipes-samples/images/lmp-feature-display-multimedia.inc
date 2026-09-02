@@ -50,7 +50,9 @@ EOF
 WorkingDirectory=/var/rootdirs/home/weston
 ExecStart=
 SupplementaryGroups=render video
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so --log=/var/rootdirs/home/weston/weston.log
+# Weston's debug extension authorises weston-screenshooter. Keep it strictly
+# tied to DEV_MODE/debug-tweaks so production images do not expose capture.
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
