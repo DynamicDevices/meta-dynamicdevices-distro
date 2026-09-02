@@ -1,5 +1,5 @@
 SUMMARY = "Godot runtime smoke project for the Jaguar Screen"
-DESCRIPTION = "Installs a deterministic headless Godot project used to prove the target engine can load and execute GDScript."
+DESCRIPTION = "Installs a deterministic Godot 3 GLES2 project used to prove the target engine can load and execute GDScript."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
@@ -12,7 +12,7 @@ SRC_URI = " \
 
 S = "${WORKDIR}"
 
-RDEPENDS:${PN} = "godot"
+RDEPENDS:${PN} = "godot3-frt"
 
 do_install() {
     install -d ${D}${bindir}

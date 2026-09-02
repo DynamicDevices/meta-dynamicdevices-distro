@@ -1,4 +1,4 @@
 CORE_IMAGE_BASE_INSTALL += " \
-    godot \
+    godot3-frt \
     screen-godot-smoke \
 "
