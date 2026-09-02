@@ -195,6 +195,10 @@ repaint-window=16
 idle-time=0
 
 [shell]
+background-image=/usr/share/screen-splash/active-edge-splash-1200x1920.png
+background-type=scale
+background-color=0xff07111f
+panel-position=none
 
 [libinput]
 touchscreen_calibrator=true
