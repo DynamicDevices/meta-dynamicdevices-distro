@@ -15,7 +15,7 @@ S = "${WORKDIR}"
 
 inherit qt6-cmake systemd
 
-DEPENDS = "qtbase qtdeclarative qtwayland"
+DEPENDS = "qtbase qtdeclarative qtdeclarative-native qtwayland"
 
 SYSTEMD_SERVICE:${PN} = "screen-qt-demo.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "disable"
@@ -30,4 +30,3 @@ do_install:append() {
 }
 
 COMPATIBLE_MACHINE = "^imx8mm-jaguar-screen$"
-
