@@ -84,11 +84,13 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
-# Enable GPU/VPU-facing GStreamer support on machines with an active screen
-require ${@bb.utils.contains('MACHINE_FEATURES', 'display-multimedia', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
+# Enable the display/multimedia software stack only when product configuration
+# requests it. MACHINE_FEATURES declares capability and is validated by the
+# product-feature contract; it must not implicitly install product software.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'display-runtime', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
 
 # Optional Qt Quick/QtWayland proof. Keep isolated until the Screen prototype
-# has passed exact-component build and board acceleration/touch checks.
+# has passed the Foundries build and board acceleration/touch checks.
 SCREEN_QT_DEMO ?= "0"
 require ${@bb.utils.contains('SCREEN_QT_DEMO', '1', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
 

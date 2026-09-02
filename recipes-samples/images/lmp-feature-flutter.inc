@@ -1,6 +1,5 @@
 CORE_IMAGE_BASE_INSTALL += " \
-    flutter-engine \
-    ivi-homescreen \
+    packagegroup-dd-flutter \
 "
 
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \

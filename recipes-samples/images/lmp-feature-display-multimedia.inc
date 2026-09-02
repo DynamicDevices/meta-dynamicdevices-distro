@@ -15,8 +15,12 @@ CORE_IMAGE_BASE_INSTALL += " \
     ${MACHINE_GSTREAMER_1_0_PLUGIN} \
 "
 
-# Screen-specific display policy: native portrait output, accelerated G2D
-# Weston, persistent runtime directory, branded background and GPU access.
+# Screen-specific display policy: the panel is mounted 90 degrees
+# counter-clockwise from its native scan direction.  Apply that transform at
+# the compositor so every client (Flutter, Godot and video) shares the same
+# logical orientation; applications must not compensate independently.
+# Weston remains G2D accelerated, with a persistent runtime directory,
+# branded background and GPU access.
 configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
@@ -37,7 +41,7 @@ touchscreen_calibrator=true
 [output]
 name=DSI-1
 mode=1200x1920
-transform=normal
+transform=rotate-90
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
@@ -46,7 +50,9 @@ EOF
 WorkingDirectory=/var/rootdirs/home/weston
 ExecStart=
 SupplementaryGroups=render video
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so --log=/var/rootdirs/home/weston/weston.log
+# Weston's debug extension authorises weston-screenshooter. Keep it strictly
+# tied to DEV_MODE/debug-tweaks so production images do not expose capture.
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
@@ -57,6 +63,8 @@ EOF
     install -d ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d/70-jaguar-screen-gpu.rules <<'EOF'
 KERNEL=="galcore", GROUP="render", MODE="0660"
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
+KERNEL=="mxc_hantro*", GROUP="video", MODE="0660"
 EOF
 }
 ROOTFS_POSTPROCESS_COMMAND:append:imx8mm-jaguar-screen = " configure_jaguar_screen_weston;"
