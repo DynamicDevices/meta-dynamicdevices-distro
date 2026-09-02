@@ -15,6 +15,7 @@ DD_PRODUCT_FEATURES_VALID = " \
     audio \
     auto-register \
     cra-audit \
+    display \
     flutter \
     improv \
     usb-gadget \
@@ -27,7 +28,7 @@ DD_PRODUCT_FEATURES_VALID = " \
 DD_PRODUCT_GRAPHICS_FEATURES = "wayland opengl x11 directfb vulkan"
 DD_PRODUCT_AUDIO_FEATURES = "pulseaudio alsa"
 DISTRO_FEATURES:remove = " \
-    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'wayland', 'flutter', 'android-container'} else d.getVar('DD_PRODUCT_GRAPHICS_FEATURES')} \
+    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'android-container'} else d.getVar('DD_PRODUCT_GRAPHICS_FEATURES')} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'android-container'} else d.getVar('DD_PRODUCT_AUDIO_FEATURES')} \
 "
 
@@ -37,8 +38,9 @@ DISTRO_FEATURES:remove = " \
 DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'alsa', 'alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'audio', 'alsa pulseaudio', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'display', 'wayland opengl vulkan', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
-    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'flutter wayland opengl pulseaudio', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'flutter wayland opengl vulkan pulseaudio', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid wayland opengl vulkan pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \

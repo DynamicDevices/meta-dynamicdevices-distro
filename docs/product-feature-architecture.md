@@ -14,7 +14,7 @@ The distro owns organisation-wide policy. Hardware facts stay in the BSP and
 default; `headless` is not itself a feature.
 
 The canonical distro removes graphical and host-audio features by default.
-Selecting `wayland`, `flutter`, `audio`, or `android-container` retains and
+Selecting `display`, `flutter`, `audio`, or `android-container` retains and
 expands the corresponding runtime. CRA audit and automatic registration remain
 global shipped-product policy rather than product options.
 
@@ -38,8 +38,8 @@ Examples:
 # Minimal/headless
 DD_PRODUCT_FEATURES = ""
 
-# Native Wayland screen
-DD_PRODUCT_FEATURES = "improv wayland"
+# Screen product with a host Wayland display runtime
+DD_PRODUCT_FEATURES = "display"
 
 # Flutter screen
 DD_PRODUCT_FEATURES = "improv flutter"
@@ -49,6 +49,10 @@ DD_PRODUCT_FEATURES = "improv android-container"
 ```
 
 Feature bundles expand prerequisites centrally. In particular,
+`display` enables the current host display provider (`wayland`, `opengl`, and
+`vulkan`).
+The lower-level `wayland` selector remains available for migration
+compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
 `vulkan`, `pulseaudio`, and `alsa`. Factory configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
