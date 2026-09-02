@@ -49,13 +49,13 @@ DD_PRODUCT_FEATURES = "improv android-container"
 ```
 
 Feature bundles expand prerequisites centrally. In particular,
-`display` enables the current host display provider (`wayland`, `opengl`, and
-`vulkan`) and the hardware multimedia image fragment. `flutter` and `godot`
+`display` enables the shipped screen stack (`wayland`, `opengl`, and
+`pipewire`) and the hardware multimedia image fragment. `flutter` and `godot`
 select their respective UI runtimes and also imply the display runtime.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
-`vulkan`, `pulseaudio`, and `alsa`. Factory configuration must use the stable
+`pulseaudio`, and `alsa`. Factory configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
 The `display`, `flutter`, and `godot` selections require the BSP to declare
