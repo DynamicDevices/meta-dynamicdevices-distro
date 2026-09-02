@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in /run/user/*/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="${socket%/*}"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export QT_QPA_PLATFORM=wayland
+        export QSG_RHI_BACKEND=opengl
+        export LC_ALL=C
+        # Replacing the shell keeps systemd lifecycle and signals attached to
+        # the Qt process.
+        # shellcheck disable=SC2093
+        exec /usr/bin/screen-qt-demo
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available" >&2
+exit 1

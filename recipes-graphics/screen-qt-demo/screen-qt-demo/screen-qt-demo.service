@@ -1,0 +1,14 @@
+[Unit]
+Description=Jaguar Screen Qt Quick display and touch proof
+After=weston.service systemd-user-sessions.service
+ConditionPathExists=/dev/dri/renderD128
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/screen-qt-demo-launcher
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+

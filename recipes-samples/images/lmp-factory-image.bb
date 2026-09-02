@@ -87,6 +87,11 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/im
 # Enable GPU/VPU-facing GStreamer support on machines with an active screen
 require ${@bb.utils.contains('MACHINE_FEATURES', 'display-multimedia', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
 
+# Optional Qt Quick/QtWayland proof. Keep isolated until the Screen prototype
+# has passed exact-component build and board acceleration/touch checks.
+SCREEN_QT_DEMO ?= "0"
+require ${@bb.utils.contains('SCREEN_QT_DEMO', '1', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
+
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
 
