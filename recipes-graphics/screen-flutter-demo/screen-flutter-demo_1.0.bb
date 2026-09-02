@@ -14,7 +14,9 @@ S = "${WORKDIR}"
 inherit systemd
 
 SYSTEMD_SERVICE:${PN} = "screen-flutter-demo.service"
-SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+# Keep the proof application installed for manual testing, but do not let it
+# take ownership of the production display at boot.
+SYSTEMD_AUTO_ENABLE:${PN} = "disable"
 
 RDEPENDS:${PN} = " \
     ivi-homescreen \

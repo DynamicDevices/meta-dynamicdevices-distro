@@ -182,17 +182,46 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
 "
 
 # The DSI panel and FT5626 controller both expose native portrait coordinates.
-# Declare that geometry explicitly so Weston does not inherit an HDMI-oriented
-# default and so libinput can bind the touchscreen to the correct output.
+# Give Weston a persistent home, access to the Vivante GPU, and an explicit
+# G2D configuration.  The stock unit's WorkingDirectory points at /home/weston,
+# which is not present in the OSTree image and otherwise fails with CHDIR/200.
 configure_jaguar_screen_weston() {
     if ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'true', 'false', d)}; then
         install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
-        cat >> ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston.ini <<'EOF'
+        cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
+[core]
+use-g2d=true
+repaint-window=16
+idle-time=0
+
+[shell]
+
+[libinput]
+touchscreen_calibrator=true
 
 [output]
 name=DSI-1
 mode=1200x1920
 transform=normal
+EOF
+
+        install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
+        cat > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf <<'EOF'
+[Service]
+WorkingDirectory=/var/rootdirs/home/weston
+ExecStart=
+SupplementaryGroups=render video
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so --log=/var/rootdirs/home/weston/weston.log
+EOF
+
+        install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
+        cat > ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/jaguar-screen-weston.conf <<'EOF'
+d /var/rootdirs/home/weston 0750 weston weston -
+EOF
+
+        install -d ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d
+        cat > ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d/70-jaguar-screen-gpu.rules <<'EOF'
+KERNEL=="galcore", GROUP="render", MODE="0660"
 EOF
     fi
 }
