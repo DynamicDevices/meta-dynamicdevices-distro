@@ -38,8 +38,8 @@ Examples:
 # Minimal/headless
 DD_PRODUCT_FEATURES = ""
 
-# Screen product with a host Wayland display runtime
-DD_PRODUCT_FEATURES = "display"
+# Jaguar Screen: established Weston, Flutter and Godot payload, without Improv
+DD_PRODUCT_FEATURES = "display flutter godot"
 
 # Flutter screen
 DD_PRODUCT_FEATURES = "improv flutter"
@@ -50,12 +50,17 @@ DD_PRODUCT_FEATURES = "improv android-container"
 
 Feature bundles expand prerequisites centrally. In particular,
 `display` enables the current host display provider (`wayland`, `opengl`, and
-`vulkan`).
+`vulkan`) and the hardware multimedia image fragment. `flutter` and `godot`
+select their respective UI runtimes and also imply the display runtime.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
 `vulkan`, `pulseaudio`, and `alsa`. Factory configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
+
+The `display`, `flutter`, and `godot` selections require the BSP to declare
+`display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
+the machine while preventing capable hardware from implicitly installing a UI.
 
 Runtime payloads are owned by provider-neutral packagegroups:
 
