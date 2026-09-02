@@ -30,7 +30,6 @@ CORE_IMAGE_BASE_INSTALL += " \
 # Screen bring-up diagnostics. This include is selected only when
 # IMAGE_FEATURES contains debug-tweaks.
 CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
-   mesa-demos \
    glmark2 \
    v4l-utils \
    media-ctl \
