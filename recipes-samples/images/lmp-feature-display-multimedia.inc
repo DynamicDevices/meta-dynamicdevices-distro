@@ -57,6 +57,8 @@ EOF
     install -d ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d/70-jaguar-screen-gpu.rules <<'EOF'
 KERNEL=="galcore", GROUP="render", MODE="0660"
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
+KERNEL=="mxc_hantro*", GROUP="video", MODE="0660"
 EOF
 }
 ROOTFS_POSTPROCESS_COMMAND:append:imx8mm-jaguar-screen = " configure_jaguar_screen_weston;"
