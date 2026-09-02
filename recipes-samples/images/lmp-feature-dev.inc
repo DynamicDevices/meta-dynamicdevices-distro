@@ -26,5 +26,14 @@ CORE_IMAGE_BASE_INSTALL += " \
    imx-memtool \
    devmem2 \
 "
+
+# Screen bring-up diagnostics. This include is selected only when
+# IMAGE_FEATURES contains debug-tweaks.
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
+   mesa-demos \
+   glmark2 \
+   v4l-utils \
+   media-ctl \
+"
 # lmp-factory-image.bb: this inc is only required when IMAGE_FEATURES contains debug-tweaks
 # (e.g. DEV_MODE), so the packages above including phytool/mdio/imx-memtool/devmem2 apply to any such image.
