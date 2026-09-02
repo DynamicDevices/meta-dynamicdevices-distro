@@ -55,7 +55,10 @@ select their respective UI runtimes and also imply the display runtime.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
-`pulseaudio`, and `alsa`. Factory configuration must use the stable
+`vulkan`, `pulseaudio`, and `alsa`. Vulkan is an intentional compatibility
+addition because the current Waydroid recipe declares it in
+`REQUIRED_DISTRO_FEATURES`; without it the provider is skipped. Factory
+configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
 The `display`, `flutter`, and `godot` selections require the BSP to declare
