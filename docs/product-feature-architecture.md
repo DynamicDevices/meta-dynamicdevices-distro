@@ -36,7 +36,7 @@ Examples:
 
 ```bitbake
 # Minimal/headless
-DD_PRODUCT_FEATURES = "improv"
+DD_PRODUCT_FEATURES = ""
 
 # Native Wayland screen
 DD_PRODUCT_FEATURES = "improv wayland"
@@ -67,6 +67,10 @@ migrated. Wayland remains provided by the upstream LmP Wayland feature hook.
 Unknown feature names are fatal at parse time. Hardware compatibility checks
 will be added as machines acquire explicit capability declarations; until then,
 the existing recipe `COMPATIBLE_MACHINE` checks remain authoritative.
+
+`imx8mm-jaguar-screen` intentionally has no `improv` feature: the product has
+no working Bluetooth onboarding path. Do not infer onboarding protocols from
+the presence of generic Wi-Fi or Bluetooth-related BSP components.
 
 ## Migration invariants
 
