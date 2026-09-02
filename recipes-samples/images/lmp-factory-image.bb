@@ -179,6 +179,8 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
        linux-firmware-iwlwifi \
        pciutils \
        socat \
+       v4l-utils \
+       media-ctl \
 "
 
 # The DSI panel and FT5626 controller both expose native portrait coordinates.
