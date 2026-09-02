@@ -15,8 +15,12 @@ CORE_IMAGE_BASE_INSTALL += " \
     ${MACHINE_GSTREAMER_1_0_PLUGIN} \
 "
 
-# Screen-specific display policy: native portrait output, accelerated G2D
-# Weston, persistent runtime directory, branded background and GPU access.
+# Screen-specific display policy: the panel is mounted 90 degrees
+# counter-clockwise from its native scan direction.  Apply that transform at
+# the compositor so every client (Flutter, Godot and video) shares the same
+# logical orientation; applications must not compensate independently.
+# Weston remains G2D accelerated, with a persistent runtime directory,
+# branded background and GPU access.
 configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
@@ -37,7 +41,7 @@ touchscreen_calibrator=true
 [output]
 name=DSI-1
 mode=1200x1920
-transform=normal
+transform=rotate-90
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
