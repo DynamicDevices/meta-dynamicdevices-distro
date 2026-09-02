@@ -46,9 +46,12 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'usb-gadget', 'usbgadget', '', d)} \
 "
 
-python () {
-    selected = set((d.getVar("DD_PRODUCT_FEATURES") or "").split())
-    valid = set((d.getVar("DD_PRODUCT_FEATURES_VALID") or "").split())
+addhandler dd_validate_product_features
+dd_validate_product_features[eventmask] = "bb.event.ConfigParsed"
+
+python dd_validate_product_features() {
+    selected = set((e.data.getVar("DD_PRODUCT_FEATURES") or "").split())
+    valid = set((e.data.getVar("DD_PRODUCT_FEATURES_VALID") or "").split())
     unknown = sorted(selected - valid)
     if unknown:
         bb.fatal(
