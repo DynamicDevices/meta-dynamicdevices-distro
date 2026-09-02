@@ -13,6 +13,11 @@ The distro owns organisation-wide policy. Hardware facts stay in the BSP and
 `DD_PRODUCT_FEATURES`. An empty product feature set is the headless/minimal
 default; `headless` is not itself a feature.
 
+The canonical distro removes graphical and host-audio features by default.
+Selecting `wayland`, `flutter`, `audio`, or `android-container` retains and
+expands the corresponding runtime. CRA audit and automatic registration remain
+global shipped-product policy rather than product options.
+
 ## Ownership
 
 | Concern | Owner | Examples |
