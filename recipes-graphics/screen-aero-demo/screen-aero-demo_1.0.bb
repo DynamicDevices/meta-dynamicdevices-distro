@@ -32,7 +32,7 @@ FILES:${PN} += "${datadir}/godot-demos"
 COMPATIBLE_MACHINE = "^imx8mm-jaguar-screen$"
 
 SRC_URI += " \
-    https://active-esl.github.io/godot-demos/aero-pressure-digital-twin/aero-2aa940639e56.pck;downloadfilename=active-edge-aero-pressure.pck;sha256sum=804479119a36881537ea5875d7a335f0a13f8f13ea296125a7791870d38d752e \
+    https://github.com/active-esl/godot-demos/releases/download/aero-pressure-v1.0.0/active-edge-aero-pressure-2aa940639e56.pck;downloadfilename=active-edge-aero-pressure.pck;sha256sum=804479119a36881537ea5875d7a335f0a13f8f13ea296125a7791870d38d752e \
     file://screen-aero-demo \
     file://screen-aero-demo.service \
 "
