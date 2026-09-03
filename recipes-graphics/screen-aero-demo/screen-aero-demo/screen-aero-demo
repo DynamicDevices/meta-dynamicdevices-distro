@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+pck=/usr/share/godot-demos/aero-pressure-digital-twin/active-edge-aero-pressure.pck
+
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in /run/user/*/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="${socket%/*}"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export SDL_VIDEODRIVER=wayland
+        # FRT forwards native SDL finger events. Do not also synthesize a
+        # one-finger mouse stream, which duplicates taps and cannot pinch.
+        export SDL_TOUCH_MOUSE_EVENTS=0
+        export SDL_MOUSE_TOUCH_EVENTS=0
+        export LC_ALL=C
+        # Replacing the shell keeps systemd signals and restart policy tied to Godot.
+        # shellcheck disable=SC2093
+        exec /usr/bin/godot3 --main-pack "$pck" --video-driver GLES2 --fullscreen
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available" >&2
+exit 1
