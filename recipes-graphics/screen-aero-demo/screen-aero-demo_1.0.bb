@@ -4,7 +4,7 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=e751627664afcd19daaa085e1699cf09"
 
 SRC_URI = "git://github.com/active-esl/godot-demos.git;protocol=https;branch=main"
-SRCREV = "72b5fa043dfd16d813374428891da44170adf984"
+SRCREV = "2aa940639e5605b09542de59cb0dc3990470f0a7"
 S = "${WORKDIR}/git"
 
 inherit systemd
@@ -16,8 +16,8 @@ RDEPENDS:${PN} = "godot3-frt"
 
 do_install() {
     install -d ${D}${datadir}/godot-demos/aero-pressure-digital-twin
-    cp -R ${S}/demos/aero-pressure-digital-twin/. \
-        ${D}${datadir}/godot-demos/aero-pressure-digital-twin/
+    install -m 0644 ${WORKDIR}/active-edge-aero-pressure.pck \
+        ${D}${datadir}/godot-demos/aero-pressure-digital-twin/active-edge-aero-pressure.pck
 
     install -d ${D}${bindir}
     install -m 0755 ${WORKDIR}/screen-aero-demo ${D}${bindir}/screen-aero-demo
@@ -32,6 +32,7 @@ FILES:${PN} += "${datadir}/godot-demos"
 COMPATIBLE_MACHINE = "^imx8mm-jaguar-screen$"
 
 SRC_URI += " \
+    https://active-esl.github.io/godot-demos/aero-pressure-digital-twin/aero-2aa940639e56.pck;downloadfilename=active-edge-aero-pressure.pck;sha256sum=804479119a36881537ea5875d7a335f0a13f8f13ea296125a7791870d38d752e \
     file://screen-aero-demo \
     file://screen-aero-demo.service \
 "
