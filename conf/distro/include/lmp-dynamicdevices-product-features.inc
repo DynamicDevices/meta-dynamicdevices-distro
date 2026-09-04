@@ -32,8 +32,8 @@ DD_PRODUCT_FEATURES_VALID = " \
 # The canonical distro is headless/minimal unless a product opts into a
 # graphical or audio runtime. Conditional removal is used instead of a fixed
 # :remove so a selected bundle can re-enable its prerequisites.
-DISTRO_FEATURES:remove += " \
-    x11 directfb vulkan \
+DISTRO_FEATURES:remove = " \
+    zeroconf x11 directfb vulkan \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'android-container'} else 'alsa'} \
@@ -42,7 +42,8 @@ DISTRO_FEATURES:remove += " \
 # Product-facing features expand to their complete runtime prerequisites.
 # "android-container" is intentionally implementation-neutral; Waydroid is
 # the current provider and may be replaced without changing factory contracts.
-DISTRO_FEATURES:append += " \
+DISTRO_FEATURES:append = " \
+    auto-register cra-audit \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'alsa', 'alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'audio', 'alsa pulseaudio', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'display', 'display-runtime wayland opengl pipewire', '', d)} \
@@ -83,6 +84,7 @@ python dd_validate_product_features() {
 # image is selected.  The later dd-graphics-etnaviv distro override wins over
 # the i.MX NXP BSP's imxgpu provider defaults without changing the BSP itself.
 PREFERRED_PROVIDER_virtual/egl:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/libgbm:dd-graphics-etnaviv = "mesa"
 PREFERRED_PROVIDER_virtual/libgl:dd-graphics-etnaviv = "mesa"
 PREFERRED_PROVIDER_virtual/mesa:dd-graphics-etnaviv = "mesa"
 PREFERRED_PROVIDER_virtual/libgles1:dd-graphics-etnaviv = "mesa"

@@ -208,6 +208,7 @@ PACKAGECONFIG:append:mx8-nxp-bsp = " kms tinycompress"
 PACKAGECONFIG:append = " ${PACKAGECONFIG_G2D}"
 PACKAGECONFIG_G2D          ??= ""
 PACKAGECONFIG_G2D:imxgpu2d ??= "g2d"
+PACKAGECONFIG_G2D:dd-graphics-etnaviv = ""
 
 PACKAGECONFIG[g2d] = ",,virtual/libg2d"
 PACKAGECONFIG[tinycompress]    = "-Dtinycompress=enabled,-Dtinycompress=disabled,tinycompress"
