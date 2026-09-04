@@ -89,10 +89,8 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/im
 # product-feature contract; it must not implicitly install product software.
 require ${@bb.utils.contains('DISTRO_FEATURES', 'display-runtime', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
 
-# Optional Qt Quick/QtWayland proof. Keep isolated until the Screen prototype
-# has passed the Foundries build and board acceleration/touch checks.
-SCREEN_QT_DEMO ?= "0"
-require ${@bb.utils.contains('SCREEN_QT_DEMO', '1', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
+# Enable Qt Quick/QtWayland recipes when requested by the product distro.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'qt6', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
 
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
