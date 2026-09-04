@@ -19,13 +19,14 @@ CORE_IMAGE_BASE_INSTALL += " \
 # counter-clockwise from its native scan direction.  Apply that transform at
 # the compositor so every client (Flutter, Godot and video) shares the same
 # logical orientation; applications must not compensate independently.
-# Weston remains G2D accelerated, with a persistent runtime directory,
-# branded background and GPU access.
+# Weston uses NXP G2D by default.  Android-container selects Mesa/Etnaviv and
+# therefore uses Weston's standard GL renderer instead.  Both paths retain the
+# same persistent runtime directory, branded background and GPU access.
 configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
 [core]
-use-g2d=true
+${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', 'use-g2d=true', d)}
 repaint-window=16
 idle-time=0
 
@@ -52,7 +53,7 @@ ExecStart=
 SupplementaryGroups=render video
 # Weston's debug extension authorises weston-screenshooter. Keep it strictly
 # tied to DEV_MODE/debug-tweaks so production images do not expose capture.
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
@@ -63,6 +64,7 @@ EOF
     install -d ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/udev/rules.d/70-jaguar-screen-gpu.rules <<'EOF'
 KERNEL=="galcore", GROUP="render", MODE="0660"
+SUBSYSTEM=="drm", KERNEL=="renderD*", GROUP="render", MODE="0660"
 SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
 KERNEL=="mxc_hantro*", GROUP="video", MODE="0660"
 EOF

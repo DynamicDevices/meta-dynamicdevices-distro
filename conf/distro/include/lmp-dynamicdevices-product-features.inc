@@ -9,6 +9,12 @@
 
 DD_PRODUCT_FEATURES ?= ""
 
+# Recipe overrides for product policies which must affect provider selection.
+# Keep this separate from NXP's use-*-bsp override: Android needs Mesa/Etnaviv,
+# but the Jaguar Screen must retain the LmP/NXP kernel, U-Boot, OP-TEE and VPU
+# integration.
+DISTROOVERRIDES .= "${@':dd-graphics-etnaviv' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else ''}"
+
 DD_PRODUCT_FEATURES_VALID = " \
     alsa \
     android-container \
@@ -27,8 +33,7 @@ DD_PRODUCT_FEATURES_VALID = " \
 # graphical or audio runtime. Conditional removal is used instead of a fixed
 # :remove so a selected bundle can re-enable its prerequisites.
 DISTRO_FEATURES:remove = " \
-    x11 directfb \
-    ${@'' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else 'vulkan'} \
+    x11 directfb vulkan \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'android-container'} else 'alsa'} \
@@ -44,7 +49,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
-    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid wayland opengl vulkan pulseaudio alsa', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid wayland opengl etnaviv pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'improv', 'improv', '', d)} \
@@ -73,3 +78,13 @@ python dd_validate_product_features() {
             % " ".join(sorted(display_software))
         )
 }
+
+# Mesa must be the EGL/GBM/GLES provider whenever Android's generic Mesa vendor
+# image is selected.  The later dd-graphics-etnaviv distro override wins over
+# the i.MX NXP BSP's imxgpu provider defaults without changing the BSP itself.
+PREFERRED_PROVIDER_virtual/egl:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/libgl:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/mesa:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/libgles1:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/libgles2:dd-graphics-etnaviv = "mesa"
+PREFERRED_PROVIDER_virtual/libgles3:dd-graphics-etnaviv = "mesa"
