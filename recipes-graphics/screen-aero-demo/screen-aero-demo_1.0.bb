@@ -10,7 +10,7 @@ S = "${WORKDIR}/git"
 inherit systemd
 
 SYSTEMD_SERVICE:${PN} = "screen-aero-demo.service"
-SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+SYSTEMD_AUTO_ENABLE:${PN} = "disable"
 
 RDEPENDS:${PN} = "godot3-frt"
 
