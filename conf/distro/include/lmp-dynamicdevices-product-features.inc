@@ -13,7 +13,7 @@ DD_PRODUCT_FEATURES ?= ""
 # Keep this separate from NXP's use-*-bsp override: Android needs Mesa/Etnaviv,
 # but the Jaguar Screen must retain the LmP/NXP kernel, U-Boot, OP-TEE and VPU
 # integration.
-DISTROOVERRIDES .= "${@':dd-graphics-etnaviv' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else ''}"
+DISTROOVERRIDES:append = "${@':dd-graphics-etnaviv' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else ''}"
 
 DD_PRODUCT_FEATURES_VALID = " \
     alsa \
@@ -32,7 +32,7 @@ DD_PRODUCT_FEATURES_VALID = " \
 # The canonical distro is headless/minimal unless a product opts into a
 # graphical or audio runtime. Conditional removal is used instead of a fixed
 # :remove so a selected bundle can re-enable its prerequisites.
-DISTRO_FEATURES:remove = " \
+DISTRO_FEATURES:remove += " \
     x11 directfb vulkan \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
@@ -42,7 +42,7 @@ DISTRO_FEATURES:remove = " \
 # Product-facing features expand to their complete runtime prerequisites.
 # "android-container" is intentionally implementation-neutral; Waydroid is
 # the current provider and may be replaced without changing factory contracts.
-DISTRO_FEATURES:append = " \
+DISTRO_FEATURES:append += " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'alsa', 'alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'audio', 'alsa pulseaudio', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'display', 'display-runtime wayland opengl pipewire', '', d)} \
