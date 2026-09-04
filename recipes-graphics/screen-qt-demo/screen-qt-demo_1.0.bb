@@ -18,7 +18,7 @@ inherit qt6-cmake systemd
 DEPENDS = "qtbase qtdeclarative qtdeclarative-native qtwayland"
 
 SYSTEMD_SERVICE:${PN} = "screen-qt-demo.service"
-SYSTEMD_AUTO_ENABLE:${PN} = "disable"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 do_install:append() {
     install -d ${D}${bindir}
