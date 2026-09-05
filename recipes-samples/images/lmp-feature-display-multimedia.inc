@@ -31,7 +31,7 @@ repaint-window=16
 idle-time=0
 
 [shell]
-background-image=/usr/share/screen-splash/active-edge-splash-1200x1920.png
+background-image=/usr/share/screen-splash/active-edge-splash-1920x1200.png
 background-type=scale
 background-color=0xff07111f
 panel-position=none
@@ -42,7 +42,7 @@ touchscreen_calibrator=true
 [output]
 name=DSI-1
 mode=1200x1920
-transform=rotate-270
+transform=rotate-90
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
