@@ -15,8 +15,8 @@ CORE_IMAGE_BASE_INSTALL += " \
     ${MACHINE_GSTREAMER_1_0_PLUGIN} \
 "
 
-# Screen-specific display policy: the panel is mounted 90 degrees
-# counter-clockwise from its native scan direction.  Apply that transform at
+# Screen-specific display policy: the panel is mounted 90 degrees clockwise
+# from its native scan direction.  Apply the inverse transform at
 # the compositor so every client (Flutter, Godot and video) shares the same
 # logical orientation; applications must not compensate independently.
 # Weston uses NXP G2D by default.  Android-container selects Mesa/Etnaviv and
@@ -42,7 +42,7 @@ touchscreen_calibrator=true
 [output]
 name=DSI-1
 mode=1200x1920
-transform=rotate-90
+transform=rotate-270
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
