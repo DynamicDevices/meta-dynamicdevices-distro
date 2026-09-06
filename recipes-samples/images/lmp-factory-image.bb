@@ -176,6 +176,7 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
        linux-firmware-iwlwifi \
        pciutils \
        socat \
+       ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', 'screen-debug-getty-config', '', d)} \
 "
 
 # This product has no cellular modem. Keep ModemManager available to other
