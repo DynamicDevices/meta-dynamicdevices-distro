@@ -178,6 +178,10 @@ CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " \
        socat \
 "
 
+# This product has no cellular modem. Keep ModemManager available to other
+# machines without spending Screen boot time probing absent WWAN hardware.
+CORE_IMAGE_BASE_INSTALL:remove:imx8mm-jaguar-screen = " modemmanager "
+
 CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        libpng \
        rng-tools \
