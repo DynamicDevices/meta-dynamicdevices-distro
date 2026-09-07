@@ -204,6 +204,11 @@ PACKAGECONFIG_REMOVE ?= " \
 "
 PACKAGECONFIG:remove = "${PACKAGECONFIG_REMOVE}"
 PACKAGECONFIG:append:mx8-nxp-bsp = " kms tinycompress"
+# i.MX95 display products use the DRM/KMS sink too.  Without this override
+# libgstkms.so is not built, so the dynamically split
+# gstreamer1.0-plugins-bad-kms package requested by the display feature does
+# not exist at rootfs assembly time.
+PACKAGECONFIG:append:mx95-nxp-bsp = " kms"
 
 PACKAGECONFIG:append = " ${PACKAGECONFIG_G2D}"
 PACKAGECONFIG_G2D          ??= ""
