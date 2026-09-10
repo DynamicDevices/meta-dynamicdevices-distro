@@ -203,6 +203,12 @@ require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'lmp-feature-audit.
 IMAGE_ROOTFS_EXTRA_SPACE:append:imx93-jaguar-eink = " + 1048576"
 WKS_FILE:imx93-jaguar-eink = "imx93-jaguar-eink-large.wks"
 
+# Leave sufficient image-construction headroom for the FRDM HDMI/Waydroid
+# product.  The Foundries resize helper expands the installed filesystem to
+# the remaining eMMC capacity on first boot, so this does not encode a fixed
+# target-device partition size.
+IMAGE_ROOTFS_EXTRA_SPACE:append:imx95-frdm-evk = " + 1048576"
+
 IMAGE_FEATURES += "ssh-server-openssh"
 
 #CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-phasora = " \
