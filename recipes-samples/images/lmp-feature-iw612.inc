@@ -1,6 +1,7 @@
 CORE_IMAGE_BASE_INSTALL += " \
   linux-firmware-nxpiw612-sdio \
   mlanutl \
+  packagegroup-nxp-otbr \
 "
 
 # BlueZ test utilities (btmgmt, extra hci helpers) — IW612 lab / LE Audio debug only; omit from production.
