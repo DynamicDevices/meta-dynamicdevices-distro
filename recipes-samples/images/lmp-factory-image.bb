@@ -237,5 +237,6 @@ EXTRA_USERS_PARAMS = "\
   groupadd ${LMP_USER}; \
   useradd -d /var/rootdirs/home/${LMP_USER} -m -p '${LMP_PASSWORD}' ${LMP_USER}; \
   usermod -a -G sudo,users,audio,plugdev,docker ${LMP_USER}; \
+  ${@'usermod -a -G video,render,wayland %s;' % d.getVar('LMP_USER') if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container'} else ''} \
   usermod -s /sbin/nologin root; \
 "
