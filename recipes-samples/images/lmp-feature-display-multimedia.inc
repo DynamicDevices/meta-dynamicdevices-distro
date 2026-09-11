@@ -68,3 +68,42 @@ KERNEL=="mxc_hantro*", GROUP="video", MODE="0660"
 EOF
 }
 ROOTFS_POSTPROCESS_COMMAND:append:imx8mm-jaguar-screen = " configure_jaguar_screen_weston;"
+
+# FRDM-IMX95 U-Boot's IT6263 bridge currently provides a fixed 720p mode.
+# Keep Weston on that same mode for the initial HDMI product profile so Linux
+# does not visibly renegotiate the monitor during compositor takeover.
+configure_frdm_imx95_weston() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
+    cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-frdm-imx95.ini <<'EOF'
+[core]
+use-g2d=true
+repaint-window=16
+idle-time=0
+
+[shell]
+background-image=/usr/share/screen-splash/active-edge-splash.png
+background-type=scale
+background-color=0xff07111f
+panel-position=none
+
+[output]
+name=HDMI-A-1
+mode=1280x720
+transform=normal
+EOF
+
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
+    cat > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/frdm-imx95.conf <<'EOF'
+[Service]
+WorkingDirectory=/var/rootdirs/home/weston
+ExecStart=
+SupplementaryGroups=render video
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-frdm-imx95.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
+EOF
+
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
+    cat > ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/frdm-imx95-weston.conf <<'EOF'
+d /var/rootdirs/home/weston 0750 weston weston -
+EOF
+}
+ROOTFS_POSTPROCESS_COMMAND:append:imx95-frdm-evk = " configure_frdm_imx95_weston;"
