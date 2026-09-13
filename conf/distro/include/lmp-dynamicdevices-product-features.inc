@@ -24,6 +24,7 @@ DD_PRODUCT_FEATURES_VALID = " \
     display \
     flutter \
     godot \
+    host-selinux \
     improv \
     usb-gadget \
     wayland \
@@ -50,7 +51,8 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
-    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid wayland opengl etnaviv pulseaudio alsa', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid wayland opengl etnaviv pulseaudio alsa selinux', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'host-selinux', 'selinux', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'improv', 'improv', '', d)} \

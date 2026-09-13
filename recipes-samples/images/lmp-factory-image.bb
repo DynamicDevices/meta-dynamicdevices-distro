@@ -15,6 +15,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'recipes-samples/imag
 # Enable waydroid related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'waydroid', 'recipes-samples/images/lmp-feature-waydroid.inc', '', d)}
 
+# Enable host SELinux policy and userspace if required by the product.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'selinux', 'recipes-samples/images/lmp-feature-host-selinux.inc', '', d)}
+
 # Enable auto register related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'auto-register', 'recipes-samples/images/lmp-feature-auto-register.inc', '', d)}
 
