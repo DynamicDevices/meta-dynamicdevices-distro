@@ -199,9 +199,10 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
 "
 
 # Include audit feature for comprehensive logging and security monitoring.
-# Jaguar Screen also needs the CRA evidence path for the R26 Waydroid product;
-# keep this machine-scoped while the wider product CI matrix is deferred.
-require ${@bb.utils.contains('MACHINE', 'imx8mm-jaguar-screen', 'lmp-feature-audit.inc', '', d)}
+# Jaguar Screen also needs the CRA evidence path for the SELinux-hardened R26
+# Waydroid product. Keep the non-SELinux screen baseline and deferred products
+# unchanged while the wider product CI matrix is deferred.
+require ${@'lmp-feature-audit.inc' if d.getVar('MACHINE') == 'imx8mm-jaguar-screen' and bb.utils.contains('DISTRO_FEATURES', 'selinux', True, False, d) else ''}
 require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'lmp-feature-audit.inc', '', d)}
 
 # === Image Size Configuration for imx93-jaguar-eink ===
