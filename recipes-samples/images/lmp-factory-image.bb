@@ -198,7 +198,10 @@ CORE_IMAGE_BASE_INSTALL:append:imx93-jaguar-eink = " \
        stm32flash \
 "
 
-# Include audit feature for comprehensive logging and security monitoring
+# Include audit feature for comprehensive logging and security monitoring.
+# Jaguar Screen also needs the CRA evidence path for the R26 Waydroid product;
+# keep this machine-scoped while the wider product CI matrix is deferred.
+require ${@bb.utils.contains('MACHINE', 'imx8mm-jaguar-screen', 'lmp-feature-audit.inc', '', d)}
 require ${@bb.utils.contains('MACHINE', 'imx93-jaguar-eink', 'lmp-feature-audit.inc', '', d)}
 
 # === Image Size Configuration for imx93-jaguar-eink ===
