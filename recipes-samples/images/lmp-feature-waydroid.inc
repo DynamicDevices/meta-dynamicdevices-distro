@@ -1,4 +1,3 @@
 CORE_IMAGE_BASE_INSTALL += " \
-  waydroid \
+  packagegroup-dd-android-container \
 "
-

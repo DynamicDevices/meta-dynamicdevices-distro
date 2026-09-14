@@ -53,18 +53,22 @@ This distro layer implements security-focused configurations:
 - **Disabled zeroconf**: Removes Avahi to reduce attack surface
 - **Commercial license support**: For security-critical proprietary components
 - **Auto-registration**: Secure device onboarding with authentication
-- **Improv protocol**: Secure BLE/Serial device provisioning
+- **Improv protocol**: Optional BLE/Serial device provisioning for products
+  whose hardware supports it
 - **Signing support**: Code signing and verification capabilities
 - **Security hardening**: Compiler flags and system hardening options
 
 ### Supported Distributions
 
-Security updates are provided for:
+Security updates are provided for the canonical product configuration:
 
-- **lmp-dynamicdevices**: Base secure distribution
+- **lmp-dynamicdevices**: Headless secure baseline with optional product
+  software selected through `DD_PRODUCT_FEATURES`
 - **lmp-dynamicdevices-base**: Minimal secure configuration
-- **lmp-dynamicdevices-flutter**: Flutter with security features
-- **lmp-dynamicdevices-waydroid**: Android container with isolation
+
+The legacy Flutter and Waydroid distro names are compatibility inputs during
+migration; equivalent new configurations use the `flutter` and
+`android-container` product features.
 
 ### Security Configuration
 

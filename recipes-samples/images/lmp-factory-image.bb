@@ -36,6 +36,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'usbgadget', 'recipes-samples/im
 # Enable flutter related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/images/lmp-feature-flutter.inc', '', d)}
 
+# Enable Godot related recipes if required by DISTRO
+require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
+
 # Enable OP-TEE related recipes if provided by the image
 require ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'recipes-samples/images/lmp-feature-optee.inc', '', d)}
 
@@ -80,6 +83,11 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 
 # Enable power management for eink boards
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
+
+# Enable the display/multimedia software stack only when product configuration
+# requests it. MACHINE_FEATURES declares capability and is validated by the
+# product-feature contract; it must not implicitly install product software.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'display-runtime', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
 
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}

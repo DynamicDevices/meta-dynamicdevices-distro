@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+source_dir=/usr/share/godot-demos/aero-pressure-digital-twin
+state_dir=/var/lib/screen-aero-demo
+
+# Godot 3 imports the GLB on first launch, so run from persistent writable
+# state while keeping the image-owned project as the versioned source.
+cp -R "$source_dir"/. "$state_dir"/
+
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in /run/user/*/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="${socket%/*}"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export SDL_VIDEODRIVER=wayland
+        export LC_ALL=C
+        # Replacing the shell keeps systemd signals and restart policy tied to Godot.
+        # shellcheck disable=SC2093
+        exec /usr/bin/godot3 --video-driver GLES2 --path "$state_dir"
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available" >&2
+exit 1
