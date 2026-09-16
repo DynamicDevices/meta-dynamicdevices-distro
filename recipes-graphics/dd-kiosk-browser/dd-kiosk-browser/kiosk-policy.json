@@ -1,0 +1,9 @@
+{
+  "AllowFileSelectionDialogs": false,
+  "BrowserGuestModeEnabled": false,
+  "DeveloperToolsAvailability": 2,
+  "DownloadRestrictions": 3,
+  "ExtensionInstallBlocklist": ["*"],
+  "IncognitoModeAvailability": 1,
+  "PrintingEnabled": false
+}

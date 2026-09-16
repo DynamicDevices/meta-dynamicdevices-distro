@@ -8,6 +8,7 @@ SRC_URI = " \
     file://dd-kiosk-browser.env \
     file://offline.html \
     file://90-dd-kiosk-browser \
+    file://kiosk-policy.json \
 "
 
 S = "${WORKDIR}"
@@ -20,13 +21,14 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 RDEPENDS:${PN} = "chromium-ozone-wayland"
 
 do_install() {
-    install -d ${D}${bindir} ${D}${systemd_system_unitdir} ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d
+    install -d ${D}${bindir} ${D}${systemd_system_unitdir} ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d ${D}${sysconfdir}/chromium/policies/managed
     install -m 0755 ${WORKDIR}/dd-kiosk-browser ${D}${bindir}/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.service ${D}${systemd_system_unitdir}/dd-kiosk-browser.service
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.env ${D}${sysconfdir}/default/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser
+    install -m 0644 ${WORKDIR}/kiosk-policy.json ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
 }
 
-CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser"
-FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser"
+CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
+FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"

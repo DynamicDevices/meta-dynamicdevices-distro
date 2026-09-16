@@ -60,6 +60,11 @@ launcher, and also implies the display runtime. Its URL is configured in
 `/etc/default/dd-kiosk-browser`; the default is a local provisioning page.
 On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
 become part of the public display. Audio remains an explicit `audio` feature.
+The kiosk package installs Chromium managed policies under
+`/etc/chromium/policies/managed`: public users cannot open file pickers,
+downloads, printing, Developer Tools, guest/incognito profiles, or install
+extensions. The policy file is a conffile for product-specific adjustments;
+physical keyboard and touch escape paths still require board testing.
 It cannot be combined with `flutter`, `godot`, or `android-container`, which
 are alternative owners of the same display.
 The lower-level `wayland` selector remains available for migration
