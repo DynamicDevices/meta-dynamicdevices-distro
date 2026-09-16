@@ -45,3 +45,12 @@ Record command output, screenshots, timestamps, and the resulting OSTree
 deployment alongside each result. Check panel rotation and touch coordinates
 together; the kiosk candidate currently uses the base `rotate-90` transform,
 while a separate uncommitted screen edit uses `rotate-270`.
+
+For the controlled-input check, exercise the panel with touch and a temporary
+USB keyboard. Try taps and scrolling, text entry where the application needs
+it, long press/context menu, `Ctrl+L`, `Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `F11`,
+`Alt+F4`, and developer-tools shortcuts. Open links that request a new window,
+file selection, download, or external protocol. Record whether each attempt
+stays on the managed fullscreen page, is blocked by policy, or restarts the
+kiosk service back into that page. Treat any usable browser chrome, shell,
+unrestricted file picker, or persistent blank screen as a failed input check.
