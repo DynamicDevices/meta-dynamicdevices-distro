@@ -12,7 +12,7 @@ or recipe build does not count as hardware acceptance.
 | Kiosk manifest commit | Pending |
 | Distro feature commit | Pending |
 | Factory configuration commit | Pending |
-| Chromium recipe version and layer commit | Pending |
+| Chromium recipe version and layer commit | `chromium-ozone-wayland_147.0.7727.116.bb` at `85eeb6b50883d22c977396f5e8fe211a7961cf2e` |
 | `bitbake chromium-ozone-wayland` | Pending |
 | `bitbake lmp-factory-image` | Pending |
 | WIC and OTA artifact names, SHA-256, bytes | Pending |
