@@ -6,8 +6,19 @@ state_dir=${STATE_DIRECTORY:-/var/lib/dd-kiosk-browser}
 runtime_dir=/run/user/$(id -u)
 
 case "$url" in
-    http://*|https://*|file://*) ;;
-    *) echo "DD_KIOSK_URL must be an HTTP(S) or file URL" >&2; exit 1 ;;
+    http://*) location=${url#http://} ;;
+    https://*) location=${url#https://} ;;
+    file:///*) location=${url#file://} ;;
+    *) echo "DD_KIOSK_URL must be an HTTP(S) or absolute file URL" >&2; exit 1 ;;
+esac
+
+case "$url" in
+    http://*|https://*)
+        authority=${location%%[/?#]*}
+        case "$authority" in
+            ''|:*|*[[:space:]]*) echo "DD_KIOSK_URL must name an HTTP(S) host" >&2; exit 1 ;;
+        esac
+        ;;
 esac
 
 # Weston creates the Wayland socket. Fail cleanly so systemd can restart us
