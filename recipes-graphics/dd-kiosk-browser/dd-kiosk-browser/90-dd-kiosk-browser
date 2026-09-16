@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+# A browser error page does not retry itself after the network returns.
+# NetworkManager runs this hook on link or connectivity recovery.
+case "${2:-}" in
+    up)
+        systemctl --no-block try-restart dd-kiosk-browser.service
+        ;;
+    connectivity-change)
+        if [ "${CONNECTIVITY_STATE:-}" = FULL ]; then
+            systemctl --no-block try-restart dd-kiosk-browser.service
+        fi
+        ;;
+esac

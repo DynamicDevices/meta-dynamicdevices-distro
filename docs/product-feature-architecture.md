@@ -14,7 +14,7 @@ The distro owns organisation-wide policy. Hardware facts stay in the BSP and
 default; `headless` is not itself a feature.
 
 The canonical distro removes graphical and host-audio features by default.
-Selecting `display`, `flutter`, `audio`, or `android-container` retains and
+Selecting `display`, `flutter`, `kiosk-browser`, `audio`, or `android-container` retains and
 expands the corresponding runtime. CRA audit and automatic registration remain
 global shipped-product policy rather than product options.
 
@@ -44,6 +44,9 @@ DD_PRODUCT_FEATURES = "display flutter godot"
 # Flutter screen
 DD_PRODUCT_FEATURES = "improv flutter"
 
+# Chromium kiosk screen
+DD_PRODUCT_FEATURES = "kiosk-browser"
+
 # Android screen; currently implemented by Waydroid
 DD_PRODUCT_FEATURES = "improv android-container"
 ```
@@ -52,6 +55,13 @@ Feature bundles expand prerequisites centrally. In particular,
 `display` enables the shipped screen stack (`wayland`, `opengl`, and
 `pipewire`) and the hardware multimedia image fragment. `flutter` and `godot`
 select their respective UI runtimes and also imply the display runtime.
+`kiosk-browser` selects Chromium Ozone Wayland and a Weston-owned fullscreen
+launcher, and also implies the display runtime. Its URL is configured in
+`/etc/default/dd-kiosk-browser`; the default is a local provisioning page.
+On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
+become part of the public display. Audio remains an explicit `audio` feature.
+It cannot be combined with `flutter`, `godot`, or `android-container`, which
+are alternative owners of the same display.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
@@ -61,7 +71,7 @@ addition because the current Waydroid recipe declares it in
 configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
-The `display`, `flutter`, and `godot` selections require the BSP to declare
+The `display`, `flutter`, `godot`, and `kiosk-browser` selections require the BSP to declare
 `display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
 the machine while preventing capable hardware from implicitly installing a UI.
 
@@ -70,7 +80,13 @@ Runtime payloads are owned by provider-neutral packagegroups:
 - `packagegroup-dd-alsa`
 - `packagegroup-dd-audio`
 - `packagegroup-dd-flutter`
+- `packagegroup-dd-kiosk-browser`
 - `packagegroup-dd-android-container`
+
+`packagegroup-dd-kiosk-browser` installs `DD_KIOSK_BROWSER_RUNTIME`, which
+defaults to `dd-kiosk-browser`. That runtime package supplies the Chromium
+launcher and depends on `chromium-ozone-wayland`; a different browser runtime
+can replace it without changing the image hook or packagegroup.
 
 The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is

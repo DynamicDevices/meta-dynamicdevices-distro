@@ -25,6 +25,7 @@ configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
 [core]
+${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'shell=kiosk-shell.so', '', d)}
 use-g2d=true
 repaint-window=16
 idle-time=0

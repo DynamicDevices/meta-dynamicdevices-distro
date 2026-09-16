@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+url=${DD_KIOSK_URL:-file:///usr/share/dd-kiosk-browser/offline.html}
+state_dir=${STATE_DIRECTORY:-/var/lib/dd-kiosk-browser}
+runtime_dir=/run/user/$(id -u)
+
+case "$url" in
+    http://*|https://*|file://*) ;;
+    *) echo "DD_KIOSK_URL must be an HTTP(S) or file URL" >&2; exit 1 ;;
+esac
+
+# Weston creates the Wayland socket. Fail cleanly so systemd can restart us
+# if the compositor is still coming up or has restarted.
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in "$runtime_dir"/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="$runtime_dir"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export LC_ALL=C
+        # shellcheck disable=SC2093
+        exec /usr/bin/chromium --ozone-platform=wayland --kiosk \
+            --no-first-run --no-default-browser-check \
+            --hide-crash-restore-bubble \
+            --user-data-dir="$state_dir/profile" "$url"
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available for the weston user" >&2
+exit 1
