@@ -77,8 +77,10 @@ checkouts were verified. The branch is committed locally but unpublished while
 recipe, image, and tuple gates remain open.
 
 A read-only manifest-ref audit found 15 of the 18 existing factory refs
-available. None of those 15 manifest XML files selects `meta-browser` or
-`meta-lts-mixins`. The refs `imx8mm-jaguar-handheld-5in`,
+available. Recursive inspection of their XML includes found no `meta-browser`
+project. Ten already select older `meta-lts-mixins` Go and Rust projects from
+their base manifests; five select no mixin. None selects the candidate kiosk
+Rust mixin revision. The refs `imx8mm-jaguar-handheld-5in`,
 `imx8mm-jaguar-handheld-7in`, and `main-rpi5` were absent both locally and on
 the configured remote. Their maintenance status must be resolved before
 claiming the all-tuple gate.
