@@ -54,3 +54,6 @@ file selection, download, or external protocol. Record whether each attempt
 stays on the managed fullscreen page, is blocked by policy, or restarts the
 kiosk service back into that page. Treat any usable browser chrome, shell,
 unrestricted file picker, or persistent blank screen as a failed input check.
+Also try creating a second browser profile and signing the browser into an
+account; both must be blocked by the managed kiosk policy. Signing into the
+deployed web application, if it offers its own login, is a separate test.
