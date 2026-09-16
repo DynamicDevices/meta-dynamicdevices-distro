@@ -1,6 +1,8 @@
 {
   "AllowFileSelectionDialogs": false,
+  "BrowserAddPersonEnabled": false,
   "BrowserGuestModeEnabled": false,
+  "BrowserSignin": 0,
   "DeveloperToolsAvailability": 2,
   "DownloadRestrictions": 3,
   "ExtensionInstallBlocklist": ["*"],
