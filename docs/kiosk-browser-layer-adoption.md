@@ -45,7 +45,12 @@ feature contract. Current pins apply only to `kiosk-browser`; the dedicated
 manifest branch isolates the mixin from existing products. A fresh baseline
 `bitbake -e rust-native` after this change shows `RUSTVERSION="1.75%"`, no
 `ddkioskbrowser` override, and no added preferred Node.js or SDK Rust version.
-Kiosk provider verification after the change is pending.
+The isolated kiosk stack subsequently parsed with 3,938 recipes and zero
+parse errors. Its expanded image environment selects Rust 1.98.1 and Node.js
+22.11.0, includes the kiosk package group and Weston, and excludes the
+Flutter, Godot, and Waydroid payloads. Its image task graph contains 565
+recipe names and 45,218 task edges, with no missing providers or cycles.
+This is static build evidence; the exact recipe and image builds are pending.
 
 The baseline `bitbake -g lmp-factory-image` completed with 587 recipe names
 and 47,283 task-graph lines. The candidate graph reported **450 unbuildable
@@ -70,6 +75,11 @@ Godot bbappend also requires a pinned `meta-godot` layer for parsing. All 26
 projects in the kiosk manifest have commit revisions, and the 26 matching local
 checkouts were verified. The branch is committed locally but unpublished while
 recipe, image, and tuple gates remain open.
+
+A read-only manifest-ref audit found 15 of the 18 existing factory refs
+available. `imx8mm-jaguar-handheld-5in`, `imx8mm-jaguar-handheld-7in`, and
+`main-rpi5` were absent both locally and on the configured remote. Their
+maintenance status must be resolved before claiming the all-tuple gate.
 
 ## Required proof before manifest promotion
 
