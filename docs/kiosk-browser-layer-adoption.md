@@ -76,6 +76,13 @@ projects in the kiosk manifest have commit revisions, and the 26 matching local
 checkouts were verified. The branch is committed locally but unpublished while
 recipe, image, and tuple gates remain open.
 
+The candidate factory configuration adds only the
+`main-jaguar-screen-kiosk` ref. A semantic YAML comparison against its parent
+commit found all 18 existing `lmp.ref_options`, 18 `lmp.tagging`, and 17
+`containers.tagging` entries unchanged. This proves the existing factory ref
+configuration is preserved; it does not replace the maintained image-build
+gate.
+
 A read-only manifest-ref audit found 15 of the 18 existing factory refs
 available. Recursive inspection of their XML includes found no `meta-browser`
 project. Ten already select older `meta-lts-mixins` Go and Rust projects from
