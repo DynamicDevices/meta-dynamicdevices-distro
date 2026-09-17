@@ -10,8 +10,11 @@ package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
 It checks compressed-file integrity and SHA-256, package membership and size
 against deployed target 2943, plus the installed Chromium binary, service,
 policy, network hook, offline page, Weston kiosk shell, and panel transform.
-The rootfs check inspects BitBake's staging tree; confirm the corresponding
-files in the final image artifact before hardware acceptance.
+The rootfs check inspects BitBake's staging tree. The verifier also decompresses
+the OTA ext4 artifact and uses `debugfs` to confirm the kiosk files and service
+are present in every OSTree deployment checkout in the shipped filesystem.
+Inspect the WIC boot partitions and
+test both installation paths before hardware acceptance.
 
 After installing the candidate, `scripts/check-kiosk-board.sh` provides a
 read-only SSH smoke check for the expected OSTree SHA, Weston, the browser

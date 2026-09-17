@@ -6,7 +6,10 @@ import hashlib
 import json
 import lzma
 import pathlib
+import shutil
+import subprocess
 import sys
+import tempfile
 
 REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston', 'packagegroup-dd-kiosk-browser'}
 FORBIDDEN_PREFIXES = (
@@ -14,6 +17,15 @@ FORBIDDEN_PREFIXES = (
     'screen-flutter-demo', 'flutter', 'libflutter',
     'packagegroup-dd-flutter', 'ivi-homescreen',
     'godot', 'screen-godot-smoke', 'screen-aero-demo',
+)
+ARTIFACT_FILES = (
+    '/usr/bin/chromium',
+    '/usr/bin/dd-kiosk-browser',
+    '/etc/default/dd-kiosk-browser',
+    '/etc/chromium/policies/managed/dd-kiosk-browser.json',
+    '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
+    '/etc/xdg/weston/weston-screen.ini',
+    '/usr/share/dd-kiosk-browser/offline.html',
 )
 
 
@@ -43,6 +55,51 @@ def verify_compressed(path, opener, label):
                 pass
     except (OSError, EOFError, lzma.LZMAError) as exc:
         raise ValueError(f'{label} failed integrity check: {exc}') from exc
+
+
+def verify_ota_ext4(path):
+    """Inspect the shipped filesystem, not only BitBake's staging rootfs."""
+    if shutil.which('debugfs') is None:
+        raise ValueError('debugfs is required to inspect the OTA ext4 artifact')
+
+    def debugfs(image, command):
+        return subprocess.run(
+            ['debugfs', '-R', command, str(image)],
+            capture_output=True, text=True, check=False,
+        )
+
+    def entries(image, directory):
+        result = debugfs(image, f'ls -p {directory}')
+        if result.returncode or 'File not found' in result.stderr:
+            raise ValueError(f'OTA ext4 missing directory {directory}')
+        return [fields[5] for line in result.stdout.splitlines()
+                if len(fields := line.split('/')) > 5 and fields[5] not in ('.', '..')]
+
+    def has_file(image, name):
+        result = debugfs(image, f'stat {name}')
+        return result.returncode == 0 and 'Inode:' in result.stdout
+
+    with tempfile.TemporaryDirectory(prefix='dd-kiosk-ext4-') as directory:
+        image = pathlib.Path(directory) / 'ota.ext4'
+        with gzip.open(path, 'rb') as compressed, image.open('wb') as output:
+            shutil.copyfileobj(compressed, output, 1024 * 1024)
+        deployments = []
+        for osname in entries(image, '/ostree/deploy'):
+            deploy_dir = f'/ostree/deploy/{osname}/deploy'
+            for checkout in entries(image, deploy_dir):
+                if checkout.endswith(('.0', '.1')):
+                    deployments.append(f'{deploy_dir}/{checkout}')
+        if not deployments:
+            raise ValueError('OTA ext4 has no OSTree deployment checkout')
+        units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
+                 '/lib/systemd/system/dd-kiosk-browser.service')
+        for deployment in deployments:
+            missing = [name for name in ARTIFACT_FILES if not has_file(image, deployment + name)]
+            if not any(has_file(image, deployment + name) for name in units):
+                missing.append('dd-kiosk-browser.service')
+            if missing:
+                raise ValueError(f'OTA ext4 deployment {deployment} missing {missing}')
+    print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
 def verify_rootfs(rootfs):
@@ -135,6 +192,10 @@ def main():
             verify_compressed(artifact, opener, label)
         except ValueError as exc:
             p.error(str(exc))
+    try:
+        verify_ota_ext4(args.ota_ext4_gz)
+    except (ValueError, OSError) as exc:
+        p.error(str(exc))
     missing = sorted(REQUIRED - candidate)
     forbidden = sorted(x for x in candidate if x.startswith(FORBIDDEN_PREFIXES))
     size = args.candidate_wic_gz.stat().st_size
