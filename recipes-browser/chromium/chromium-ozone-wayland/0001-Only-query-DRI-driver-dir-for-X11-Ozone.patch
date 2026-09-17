@@ -10,8 +10,9 @@ directory when the X11 Ozone platform is disabled.
 Upstream-Status: Inappropriate [i.MX Wayland-only product configuration]
 
 ---
- content/gpu/BUILD.gn | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ content/gpu/BUILD.gn       | 2 +-
+ media/gpu/sandbox/BUILD.gn | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/content/gpu/BUILD.gn b/content/gpu/BUILD.gn
 index 8a00000..8a00001 100644
@@ -25,3 +26,16 @@ index 8a00000..8a00001 100644
      configs += [ "//build/config/linux/dri" ]
    }
  }
+
+diff --git a/media/gpu/sandbox/BUILD.gn b/media/gpu/sandbox/BUILD.gn
+index 8b00000..8b00001 100644
+--- a/media/gpu/sandbox/BUILD.gn
++++ b/media/gpu/sandbox/BUILD.gn
+@@ -26,6 +26,6 @@ source_set("sandbox") {
+   }
+   if (current_cpu != "s390x" && current_cpu != "ppc64" && is_linux &&
+-      !is_castos) {
++      !is_castos && ozone_platform_x11) {
+     # For DRI_DRIVER_DIR.
+     configs += [ "//build/config/linux/dri" ]
+   }
