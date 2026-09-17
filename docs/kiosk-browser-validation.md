@@ -13,7 +13,8 @@ policy, network hook, offline page, Weston kiosk shell, and panel transform.
 The rootfs check inspects BitBake's staging tree. The verifier also decompresses
 the OTA ext4 artifact and uses `debugfs` to confirm the kiosk files and service
 are present in every OSTree deployment checkout in the shipped filesystem.
-Inspect the WIC boot partitions and
+It also checks the WIC boot FAT and compares the WIC root partition byte for
+byte with the verified OTA ext4. Inspect the actual boot files and
 test both installation paths before hardware acceptance.
 
 After installing the candidate, `scripts/check-kiosk-board.sh` provides a

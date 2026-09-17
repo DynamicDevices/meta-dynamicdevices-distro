@@ -102,6 +102,54 @@ def verify_ota_ext4(path):
     print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
+def verify_wic_partitions(wic_gz, ota_gz):
+    """Prove WIC contains the checked OTA root and a readable FAT boot volume."""
+    for tool in ('sfdisk', 'fsck.vfat'):
+        if shutil.which(tool) is None:
+            raise ValueError(f'{tool} is required to inspect the WIC artifact')
+    with tempfile.TemporaryDirectory(prefix='dd-kiosk-wic-') as directory:
+        image = pathlib.Path(directory) / 'factory.wic'
+        ota = pathlib.Path(directory) / 'ota.ext4'
+        for source, target in ((wic_gz, image), (ota_gz, ota)):
+            with gzip.open(source, 'rb') as compressed, target.open('wb') as output:
+                shutil.copyfileobj(compressed, output, 1024 * 1024)
+        result = subprocess.run(['sfdisk', '--json', str(image)],
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise ValueError(f'cannot read WIC partition table: {result.stderr.strip()}')
+        table = json.loads(result.stdout)['partitiontable']
+        partitions = table.get('partitions', [])
+        if table.get('label') != 'dos' or len(partitions) != 2:
+            raise ValueError('WIC does not have the expected DOS boot/root layout')
+        sector_size = table.get('sectorsize', 512)
+        boot, root = partitions
+        if boot['start'] >= root['start'] or boot['size'] <= 0 or root['size'] <= 0:
+            raise ValueError('WIC boot/root partition geometry is invalid')
+        ota_size = ota.stat().st_size
+        if root['size'] * sector_size < ota_size:
+            raise ValueError('WIC root partition is smaller than the OTA ext4 image')
+        with image.open('rb') as candidate, ota.open('rb') as expected:
+            candidate.seek(root['start'] * sector_size)
+            while chunk := expected.read(1024 * 1024):
+                if candidate.read(len(chunk)) != chunk:
+                    raise ValueError('WIC root partition differs from OTA ext4')
+        boot_image = pathlib.Path(directory) / 'boot.vfat'
+        with image.open('rb') as candidate, boot_image.open('wb') as output:
+            candidate.seek(boot['start'] * sector_size)
+            remaining = boot['size'] * sector_size
+            while remaining:
+                chunk = candidate.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    raise ValueError('WIC boot partition is truncated')
+                output.write(chunk)
+                remaining -= len(chunk)
+        check = subprocess.run(['fsck.vfat', '-n', str(boot_image)],
+                               capture_output=True, text=True, check=False)
+        if check.returncode:
+            raise ValueError(f'WIC boot FAT check failed: {check.stdout.strip()}')
+    print(f'WIC boot FAT and OTA root copy: verified in {wic_gz}')
+
+
 def verify_rootfs(rootfs):
     required = (
         'usr/bin/chromium',
@@ -194,6 +242,7 @@ def main():
             p.error(str(exc))
     try:
         verify_ota_ext4(args.ota_ext4_gz)
+        verify_wic_partitions(args.candidate_wic_gz, args.ota_ext4_gz)
     except (ValueError, OSError) as exc:
         p.error(str(exc))
     missing = sorted(REQUIRED - candidate)
