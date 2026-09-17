@@ -33,9 +33,12 @@ baseline comparisons and all maintained image tuples pass. In particular,
 compare Rust, Node.js, librsvg and libgit2 providers and versions.
 
 The first exact-pinned kiosk parse completed with 4,207 recipes and zero parse
-errors. The Chromium 147.0.7727.116 recipe completed fetch, unpack, and
-patch, including its 5.3 GB source archive. Compile and package QA remain
-pending. The original screen profile parsed with 4,193 recipes and the same
+errors. The Chromium 147.0.7727.116 recipe completed fetch, unpack, patch,
+and configure, including its 5.3 GB source archive. The initial configure
+failed because two GN targets queried Mesa's `dri.pc` on the Vivante Wayland
+stack; a recipe-scoped patch now limits both queries to X11 Ozone. The exact
+configure retry passed. Compile and package QA remain pending. The original
+screen profile parsed with 4,193 recipes and the same
 three warnings as the candidate. An initial shared-manifest experiment changed
 21 existing recipe versions: Rust/Cargo variants, Node.js, librsvg, libgit2,
 GN and cargo-c. A temporary set of non-kiosk provider pins restored the old
@@ -51,6 +54,15 @@ parse errors. Its expanded image environment selects Rust 1.98.1 and Node.js
 Flutter, Godot, and Waydroid payloads. Its image task graph contains 565
 recipe names and 45,218 task edges, with no missing providers or cycles.
 This is static build evidence; the exact recipe and image builds are pending.
+
+The first full Chromium recipe build stopped in the prerequisite
+`linux-libc-headers:do_package`: the base Scarthgap pseudo 1.9.0 failed with
+`unknown base path for fd` while GNU tar extracted headers. A native-only
+bbappend pins upstream pseudo 1.9.7 and adapts OE Core's older-glibc linker
+patch to its changed source layout. The exact pseudo-native build and
+`linux-libc-headers:do_package` then passed. The full Chromium recipe retry is
+pending; this host-tool change remains part of the isolated kiosk manifest's
+layer-adoption gate.
 
 The baseline `bitbake -g lmp-factory-image` completed with 587 recipe names
 and 47,283 task-graph lines. The candidate graph reported **450 unbuildable
