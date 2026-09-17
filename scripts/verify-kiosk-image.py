@@ -9,6 +9,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 
 REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston',
@@ -101,6 +102,31 @@ def verify_ota_ext4(path):
             if missing:
                 raise ValueError(f'OTA ext4 deployment {deployment} missing {missing}')
     print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
+    return {deployment.lstrip('/') for deployment in deployments}
+
+
+def verify_ota_tar(path, deployments):
+    """Check the separate OTA tar ships the same named deployment payload."""
+    required = {f'{deployment}{name}' for deployment in deployments
+                for name in ARTIFACT_FILES}
+    units = {deployment: {f'{deployment}/usr/lib/systemd/system/dd-kiosk-browser.service',
+                          f'{deployment}/lib/systemd/system/dd-kiosk-browser.service'}
+             for deployment in deployments}
+    found = set()
+    with tarfile.open(path, mode='r|xz') as archive:
+        for member in archive:
+            if not (member.isfile() or member.issym()):
+                continue
+            name = member.name[2:] if member.name.startswith('./') else member.name
+            if name in required or any(name in variants for variants in units.values()):
+                found.add(name)
+    missing = sorted(required - found)
+    for deployment, variants in units.items():
+        if not variants & found:
+            missing.append(f'{deployment}/dd-kiosk-browser.service')
+    if missing:
+        raise ValueError(f'OTA tar missing kiosk payload: {missing}')
+    print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
 def verify_wic_partitions(wic_gz, ota_gz):
@@ -248,9 +274,10 @@ def main():
         except ValueError as exc:
             p.error(str(exc))
     try:
-        verify_ota_ext4(args.ota_ext4_gz)
+        deployments = verify_ota_ext4(args.ota_ext4_gz)
+        verify_ota_tar(args.ota_tar_xz, deployments)
         verify_wic_partitions(args.candidate_wic_gz, args.ota_ext4_gz)
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, tarfile.TarError) as exc:
         p.error(str(exc))
     missing = sorted(REQUIRED - candidate)
     forbidden = sorted(x for x in candidate if x.startswith(FORBIDDEN_PREFIXES))
