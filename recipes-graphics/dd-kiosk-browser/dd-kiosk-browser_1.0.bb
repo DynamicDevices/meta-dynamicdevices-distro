@@ -18,7 +18,7 @@ inherit systemd
 SYSTEMD_SERVICE:${PN} = "dd-kiosk-browser.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
-RDEPENDS:${PN} = "chromium-ozone-wayland"
+RDEPENDS:${PN} = "chromium-ozone-wayland networkmanager-daemon"
 
 do_install() {
     install -d ${D}${bindir} ${D}${systemd_system_unitdir} ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d ${D}${sysconfdir}/chromium/policies/managed

@@ -11,7 +11,8 @@ import subprocess
 import sys
 import tempfile
 
-REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston', 'packagegroup-dd-kiosk-browser'}
+REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston',
+            'networkmanager-daemon', 'packagegroup-dd-kiosk-browser'}
 FORBIDDEN_PREFIXES = (
     'waydroid', 'packagegroup-dd-android-container',
     'screen-flutter-demo', 'flutter', 'libflutter',
