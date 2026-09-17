@@ -27,6 +27,12 @@ esac
 service_state weston.service
 service_state dd-kiosk-browser.service
 service_state NetworkManager.service
+service_user=$(systemctl show dd-kiosk-browser.service --property=User --value 2>/dev/null || true)
+printf 'kiosk service user: %s\n' "${service_user:-unknown}"
+[ "$service_user" = weston ] || failed=1
+state_owner=$(stat -c %U /var/lib/dd-kiosk-browser 2>/dev/null || true)
+printf 'kiosk state owner: %s\n' "${state_owner:-missing}"
+[ "$state_owner" = weston ] || failed=1
 printf 'chromium kiosk process: '
 browser_flags=absent
 for pid in $(pgrep -f chromium-bin || true); do
