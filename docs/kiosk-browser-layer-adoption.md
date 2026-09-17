@@ -110,6 +110,12 @@ Rust mixin revision. The refs `imx8mm-jaguar-handheld-5in`,
 the configured remote. Their maintenance status must be resolved before
 claiming the all-tuple gate.
 
+The factory configuration has 18 pre-existing `ref_options`: 14 request a
+`mfgtool-files` build and four are factory-image-only. Of the 15 refs currently
+available for comparison, 12 request `mfgtool-files`. The two absent handheld
+refs request mfgtool builds; the absent RPi5 ref does not. These counts define
+the validation queue; they do not imply any image build has passed.
+
 ## Required proof before manifest promotion
 
 1. Parse the exact-pinned proposed stack and one kiosk tuple; build the
