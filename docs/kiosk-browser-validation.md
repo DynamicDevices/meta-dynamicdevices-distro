@@ -31,6 +31,7 @@ touch handling, network recovery, reboot, or OTA; record those separately.
 | Distro feature commit | Pending |
 | Factory configuration commit | Pending |
 | Chromium recipe version and layer commit | `chromium-ozone-wayland_147.0.7727.116.bb` at `85eeb6b50883d22c977396f5e8fe211a7961cf2e` |
+| Feature contract negative parses | Separate BitBake parses rejected `kiosk-browser flutter`, kiosk on `imx8mm-jaguar-sentai` without `display-multimedia`, and unknown feature `bogus`; each exited 1 with the intended error |
 | `bitbake chromium-ozone-wayland` | Pending |
 | `bitbake lmp-factory-image` | Pending |
 | WIC and OTA artifact names, SHA-256, bytes | Pending |
