@@ -10,6 +10,7 @@ The first kiosk tuple is `imx8mm-jaguar-screen` with
 | --- | --- | --- | --- |
 | `meta-browser/meta-chromium` | `scarthgap` | `85eeb6b50883d22c977396f5e8fe211a7961cf2e` | `chromium-ozone-wayland` 147.0.7727.116 |
 | `meta-lts-mixins` | `scarthgap/rust` | `eedcdc7486ff15c3510c2ceff68c87d9db141312` | Required Rust toolchain mixin |
+| `meta-clang` | `scarthgap-clang20` | `f26bab34e6c208149fe1ad04521864b663489f4d` | Clang 20.1.1 for Chromium 147's bundled libc++ |
 
 The Chromium layer declares dependencies on `clang-layer`, `core`,
 `openembedded-layer`, and `scarthgap-rust-mixin`. The first three already exist
@@ -62,7 +63,12 @@ bbappend pins upstream pseudo 1.9.7 and adapts OE Core's older-glibc linker
 patch to its changed source layout. The exact pseudo-native build and
 `linux-libc-headers:do_package` then passed. The full Chromium recipe retry is
 pending; this host-tool change remains part of the isolated kiosk manifest's
-layer-adoption gate.
+layer-adoption gate. The retry reached Chromium `do_compile`, where its
+bundled libc++ rejected the base LmP Clang 18 toolchain and declared a Clang
+20 minimum. The candidate manifest now overrides only its `meta-clang`
+project with the exact `scarthgap-clang20` revision above. A fresh parse of
+that local stack completed with 3,939 recipes and zero errors. The Clang 20
+toolchain and Chromium recipe still require full build proof.
 
 The baseline `bitbake -g lmp-factory-image` completed with 587 recipe names
 and 47,283 task-graph lines. The candidate graph reported **450 unbuildable
