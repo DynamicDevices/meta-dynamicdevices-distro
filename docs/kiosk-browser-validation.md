@@ -13,6 +13,13 @@ policy, network hook, offline page, Weston kiosk shell, and panel transform.
 The rootfs check inspects BitBake's staging tree; confirm the corresponding
 files in the final image artifact before hardware acceptance.
 
+After installing the candidate, `scripts/check-kiosk-board.sh` provides a
+read-only SSH smoke check for the expected OSTree SHA, Weston, the browser
+service, NetworkManager, Chromium kiosk flags, managed policy, and Wayland
+socket. Supply the board's current `fio@address` and the exact expected
+64-character deployment SHA. This check does not prove visible rendering,
+touch handling, network recovery, reboot, or OTA; record those separately.
+
 ## Build record
 
 | Evidence | Value / result |
