@@ -27,6 +27,7 @@ ARTIFACT_FILES = (
     '/etc/chromium/policies/managed/dd-kiosk-browser.json',
     '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
     '/etc/xdg/weston/weston-screen.ini',
+    '/etc/systemd/system/weston.service.d/screen.conf',
     '/usr/share/dd-kiosk-browser/offline.html',
 )
 
@@ -185,6 +186,7 @@ def verify_rootfs(rootfs):
         'etc/chromium/policies/managed/dd-kiosk-browser.json',
         'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
         'etc/xdg/weston/weston-screen.ini',
+        'etc/systemd/system/weston.service.d/screen.conf',
         'usr/share/dd-kiosk-browser/offline.html',
     )
     missing = [path for path in required if not (rootfs / path).is_file()]
@@ -207,6 +209,9 @@ def verify_rootfs(rootfs):
         raise ValueError('rootfs Weston config does not select kiosk shell')
     if 'transform=rotate-90' not in weston:
         raise ValueError('rootfs Weston config lacks candidate panel transform')
+    weston_service = (rootfs / 'etc/systemd/system/weston.service.d/screen.conf').read_text()
+    if '--config=/etc/xdg/weston/weston-screen.ini' not in weston_service:
+        raise ValueError('rootfs Weston service does not select candidate screen config')
     if not any(path.is_file() for path in rootfs.rglob('kiosk-shell.so')):
         raise ValueError('rootfs lacks Weston kiosk-shell.so module')
     policy_path = rootfs / 'etc/chromium/policies/managed/dd-kiosk-browser.json'
