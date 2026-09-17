@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Date: Thu, 17 Sep 2026 18:30:00 +0100
+Subject: [PATCH] gl: match GBM EGL native window type for Wayland
+
+The Wayland GPU sources include gbm.h before EGL, selecting a void pointer
+for EGLNativeWindowType. The core GL translation unit otherwise selects
+intptr_t through USE_OZONE, producing a different C++ constructor symbol
+for NativeViewGLSurfaceEGL and an undefined reference at the final link.
+
+Include GBM before the EGL surface header so both translation units agree.
+
+Upstream-Status: Inappropriate [i.MX Wayland GBM product configuration]
+
+---
+ ui/gl/gl_surface_egl.cc | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/ui/gl/gl_surface_egl.cc b/ui/gl/gl_surface_egl.cc
+index abcd123..abcd124 100644
+--- a/ui/gl/gl_surface_egl.cc
++++ b/ui/gl/gl_surface_egl.cc
+@@ -5 +5,3 @@
++#include <gbm.h>
++
+ #include "ui/gl/gl_surface_egl.h"
