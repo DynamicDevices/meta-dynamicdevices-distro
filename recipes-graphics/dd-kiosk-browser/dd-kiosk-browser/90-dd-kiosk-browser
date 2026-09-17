@@ -8,10 +8,10 @@ case "${2:-}" in
         systemctl --no-block try-restart dd-kiosk-browser.service
         ;;
     connectivity-change)
-        # NetworkManager exports lowercase states: unknown, none, portal,
-        # limited, and full.
-        if [ "${CONNECTIVITY_STATE:-}" = full ]; then
-            systemctl --no-block try-restart dd-kiosk-browser.service
-        fi
+        # NetworkManager 1.46 exports uppercase state names. Accept the
+        # lowercase form used by older releases as well.
+        case "${CONNECTIVITY_STATE:-}" in
+            FULL|full) systemctl --no-block try-restart dd-kiosk-browser.service ;;
+        esac
         ;;
 esac
