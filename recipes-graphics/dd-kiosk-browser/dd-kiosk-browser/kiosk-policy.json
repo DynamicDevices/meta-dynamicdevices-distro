@@ -7,5 +7,6 @@
   "DownloadRestrictions": 3,
   "ExtensionInstallBlocklist": ["*"],
   "IncognitoModeAvailability": 1,
-  "PrintingEnabled": false
+  "PrintingEnabled": false,
+  "URLBlocklist": ["view-source:*"]
 }

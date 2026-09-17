@@ -8,7 +8,7 @@ or recipe build does not count as hardware acceptance.
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
 It checks compressed-file integrity and SHA-256, package membership and size
-against deployed target 2943, plus the installed Chromium binary, service,
+against active target 2945, plus the installed Chromium binary, service,
 policy, network hook, offline page, Weston kiosk shell, and panel transform.
 The rootfs check inspects BitBake's staging tree. The verifier also decompresses
 the OTA ext4 artifact and uses `debugfs` to confirm the kiosk files and service
@@ -47,8 +47,9 @@ The registered physical target is
 `imx8mm-jaguar-screen-2210a09dab86563`. Before installing a test image,
 confirm its hostname, current OSTree deployment and rollback entry, and the
 factory/tag to which it is registered. The last read-only baseline observed
-target `2943` (`81e0a111532fc9bbddeb3e2cdf1c18683a8a0369bea5cb41b8586e8ad59d648e`)
-with Weston active. This baseline is not a kiosk test result.
+target `2945` (`d100cd3b1577a91a897f24befcc1d3e51c2b7639705c7315abb3f4fe13100b9e`)
+with Weston active and target 2943 retained as rollback. This baseline is not
+a kiosk test result.
 
 | Check | Required evidence | Result |
 | --- | --- | --- |
@@ -69,7 +70,8 @@ while a separate uncommitted screen edit uses `rotate-270`.
 For the controlled-input check, exercise the panel with touch and a temporary
 USB keyboard. Try taps and scrolling, text entry where the application needs
 it, long press/context menu, `Ctrl+L`, `Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `F11`,
-`Alt+F4`, and developer-tools shortcuts. Open links that request a new window,
+`Alt+F4`, developer-tools shortcuts, and direct `view-source:` navigation.
+Open links that request a new window,
 file selection, download, or external protocol. Record whether each attempt
 stays on the managed fullscreen page, is blocked by policy, or restarts the
 kiosk service back into that page. Treat any usable browser chrome, shell,

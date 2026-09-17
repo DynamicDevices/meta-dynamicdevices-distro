@@ -195,6 +195,7 @@ def verify_rootfs(rootfs):
         'ExtensionInstallBlocklist': ['*'],
         'IncognitoModeAvailability': 1,
         'PrintingEnabled': False,
+        'URLBlocklist': ['view-source:*'],
     }
     for name, value in expected_policy.items():
         if policy.get(name) != value:
@@ -210,14 +211,19 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('candidate_manifest', type=pathlib.Path)
     p.add_argument('candidate_wic_gz', type=pathlib.Path)
-    p.add_argument('--baseline-manifest', type=pathlib.Path,
-                   default=pathlib.Path('/tmp/dd-kiosk-baseline-2943.manifest'))
-    p.add_argument('--baseline-wic-gz-bytes', type=int, default=443717496)
+    p.add_argument('--baseline-manifest', type=pathlib.Path, required=True)
+    p.add_argument('--baseline-wic-gz-bytes', type=int, required=True)
+    p.add_argument('--baseline-ota-ext4-gz-bytes', type=int, required=True)
+    p.add_argument('--baseline-ota-tar-xz-bytes', type=int, required=True)
     p.add_argument('--ota-ext4-gz', type=pathlib.Path, required=True)
     p.add_argument('--ota-tar-xz', type=pathlib.Path, required=True)
     p.add_argument('--rootfs', type=pathlib.Path, required=True,
                    help='BitBake image rootfs directory to inspect installed files')
     args = p.parse_args()
+    for name in ('baseline_wic_gz_bytes', 'baseline_ota_ext4_gz_bytes',
+                 'baseline_ota_tar_xz_bytes'):
+        if getattr(args, name) <= 0:
+            p.error(f'--{name.replace("_", "-")} must be positive')
     if not args.rootfs.is_dir():
         p.error(f'--rootfs does not name a directory: {args.rootfs}')
     try:
@@ -255,8 +261,8 @@ def main():
     print(f'WIC gzip: {size:,} bytes; deployed baseline: {args.baseline_wic_gz_bytes:,} bytes; delta: {delta:+,} bytes ({delta / args.baseline_wic_gz_bytes:+.1%})')
     print(f'WIC SHA-256: {sha256(args.candidate_wic_gz)}')
     for label, artifact, baseline_bytes in (
-        ('OTA ext4 gzip', args.ota_ext4_gz, 442775950),
-        ('OTA tar xz', args.ota_tar_xz, 290531828),
+        ('OTA ext4 gzip', args.ota_ext4_gz, args.baseline_ota_ext4_gz_bytes),
+        ('OTA tar xz', args.ota_tar_xz, args.baseline_ota_tar_xz_bytes),
     ):
         if artifact is not None:
             artifact_size = artifact.stat().st_size
