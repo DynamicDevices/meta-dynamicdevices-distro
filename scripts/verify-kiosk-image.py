@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""Validate one completed kiosk image against the deployed screen baseline."""
+import argparse
+import gzip
+import hashlib
+import json
+import lzma
+import pathlib
+import sys
+
+REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston', 'packagegroup-dd-kiosk-browser'}
+FORBIDDEN_PREFIXES = (
+    'waydroid', 'packagegroup-dd-android-container',
+    'screen-flutter-demo', 'flutter', 'libflutter',
+    'packagegroup-dd-flutter', 'ivi-homescreen',
+    'godot', 'screen-godot-smoke', 'screen-aero-demo',
+)
+
+
+def packages(path):
+    result = set()
+    for line in path.read_text().splitlines():
+        if line.strip():
+            result.add(line.split()[0])
+    return result
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as artifact:
+        while True:
+            chunk = artifact.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_compressed(path, opener, label):
+    try:
+        with opener(path, 'rb') as artifact:
+            while artifact.read(1024 * 1024):
+                pass
+    except (OSError, EOFError, lzma.LZMAError) as exc:
+        raise ValueError(f'{label} failed integrity check: {exc}') from exc
+
+
+def verify_rootfs(rootfs):
+    required = (
+        'usr/bin/chromium',
+        'usr/bin/dd-kiosk-browser',
+        'etc/default/dd-kiosk-browser',
+        'etc/chromium/policies/managed/dd-kiosk-browser.json',
+        'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
+        'etc/xdg/weston/weston-screen.ini',
+        'usr/share/dd-kiosk-browser/offline.html',
+    )
+    missing = [path for path in required if not (rootfs / path).is_file()]
+    if missing:
+        raise ValueError(f'rootfs missing files: {missing}')
+    unit_paths = (
+        rootfs / 'lib/systemd/system/dd-kiosk-browser.service',
+        rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service',
+    )
+    unit_path = next((path for path in unit_paths if path.is_file()), None)
+    if unit_path is None:
+        raise ValueError('rootfs lacks dd-kiosk-browser.service')
+    service = unit_path.read_text()
+    if 'User=weston' not in service or 'StateDirectory=dd-kiosk-browser' not in service:
+        raise ValueError('rootfs kiosk service lacks Weston ownership or writable state')
+    if 'Restart=always' not in service or 'After=weston.service' not in service:
+        raise ValueError('rootfs kiosk service lacks restart or compositor ordering')
+    weston = (rootfs / 'etc/xdg/weston/weston-screen.ini').read_text()
+    if 'shell=kiosk-shell.so' not in weston:
+        raise ValueError('rootfs Weston config does not select kiosk shell')
+    if 'transform=rotate-90' not in weston:
+        raise ValueError('rootfs Weston config lacks candidate panel transform')
+    if not any(path.is_file() for path in rootfs.rglob('kiosk-shell.so')):
+        raise ValueError('rootfs lacks Weston kiosk-shell.so module')
+    policy_path = rootfs / 'etc/chromium/policies/managed/dd-kiosk-browser.json'
+    policy = json.loads(policy_path.read_text())
+    expected_policy = {
+        'AllowFileSelectionDialogs': False,
+        'BrowserAddPersonEnabled': False,
+        'BrowserGuestModeEnabled': False,
+        'BrowserSignin': 0,
+        'DeveloperToolsAvailability': 2,
+        'DownloadRestrictions': 3,
+        'ExtensionInstallBlocklist': ['*'],
+        'IncognitoModeAvailability': 1,
+        'PrintingEnabled': False,
+    }
+    for name, value in expected_policy.items():
+        if policy.get(name) != value:
+            raise ValueError(f'rootfs Chromium policy {name} does not match kiosk contract')
+    for executable in ('usr/bin/chromium', 'usr/bin/dd-kiosk-browser',
+                       'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser'):
+        if not (rootfs / executable).stat().st_mode & 0o111:
+            raise ValueError(f'rootfs file is not executable: {executable}')
+    print(f'rootfs payload and kiosk service: verified at {rootfs}')
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('candidate_manifest', type=pathlib.Path)
+    p.add_argument('candidate_wic_gz', type=pathlib.Path)
+    p.add_argument('--baseline-manifest', type=pathlib.Path,
+                   default=pathlib.Path('/tmp/dd-kiosk-baseline-2943.manifest'))
+    p.add_argument('--baseline-wic-gz-bytes', type=int, default=443717496)
+    p.add_argument('--ota-ext4-gz', type=pathlib.Path, required=True)
+    p.add_argument('--ota-tar-xz', type=pathlib.Path, required=True)
+    p.add_argument('--rootfs', type=pathlib.Path, required=True,
+                   help='BitBake image rootfs directory to inspect installed files')
+    args = p.parse_args()
+    if not args.rootfs.is_dir():
+        p.error(f'--rootfs does not name a directory: {args.rootfs}')
+    try:
+        verify_rootfs(args.rootfs)
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        p.error(str(exc))
+    candidate = packages(args.candidate_manifest)
+    baseline = packages(args.baseline_manifest)
+    if not args.candidate_wic_gz.name.endswith('.wic.gz'):
+        p.error('candidate_wic_gz must be a .wic.gz image artifact')
+    if not args.ota_ext4_gz.name.endswith('.ota-ext4.gz'):
+        p.error('--ota-ext4-gz must name a .ota-ext4.gz artifact')
+    if not args.ota_tar_xz.name.endswith('.ota.tar.xz'):
+        p.error('--ota-tar-xz must name a .ota.tar.xz artifact')
+    for artifact, opener, label in (
+        (args.candidate_wic_gz, gzip.open, 'WIC gzip'),
+        (args.ota_ext4_gz, gzip.open, 'OTA ext4 gzip'),
+        (args.ota_tar_xz, lzma.open, 'OTA tar xz'),
+    ):
+        try:
+            verify_compressed(artifact, opener, label)
+        except ValueError as exc:
+            p.error(str(exc))
+    missing = sorted(REQUIRED - candidate)
+    forbidden = sorted(x for x in candidate if x.startswith(FORBIDDEN_PREFIXES))
+    size = args.candidate_wic_gz.stat().st_size
+    delta = size - args.baseline_wic_gz_bytes
+    print(f'candidate packages: {len(candidate)}; deployed baseline: {len(baseline)}')
+    print(f'added: {len(candidate - baseline)}; removed: {len(baseline - candidate)}')
+    print(f'WIC gzip: {size:,} bytes; deployed baseline: {args.baseline_wic_gz_bytes:,} bytes; delta: {delta:+,} bytes ({delta / args.baseline_wic_gz_bytes:+.1%})')
+    print(f'WIC SHA-256: {sha256(args.candidate_wic_gz)}')
+    for label, artifact, baseline_bytes in (
+        ('OTA ext4 gzip', args.ota_ext4_gz, 442775950),
+        ('OTA tar xz', args.ota_tar_xz, 290531828),
+    ):
+        if artifact is not None:
+            artifact_size = artifact.stat().st_size
+            artifact_delta = artifact_size - baseline_bytes
+            print(f'{label}: {artifact.name}; {artifact_size:,} bytes; deployed baseline: {baseline_bytes:,} bytes; delta: {artifact_delta:+,} bytes ({artifact_delta / baseline_bytes:+.1%})')
+            print(f'{label} SHA-256: {sha256(artifact)}')
+    print('required missing:', missing or 'none')
+    print('forbidden payload:', forbidden or 'none')
+    return 1 if missing or forbidden else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

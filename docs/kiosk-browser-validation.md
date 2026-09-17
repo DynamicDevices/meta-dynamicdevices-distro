@@ -5,6 +5,14 @@ This record applies to `imx8mm-jaguar-screen` with
 factory target, image checksums, and observed results together. A local parse
 or recipe build does not count as hardware acceptance.
 
+After the image build, run `scripts/verify-kiosk-image.py` with the candidate
+package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
+It checks compressed-file integrity and SHA-256, package membership and size
+against deployed target 2943, plus the installed Chromium binary, service,
+policy, network hook, offline page, Weston kiosk shell, and panel transform.
+The rootfs check inspects BitBake's staging tree; confirm the corresponding
+files in the final image artifact before hardware acceptance.
+
 ## Build record
 
 | Evidence | Value / result |
