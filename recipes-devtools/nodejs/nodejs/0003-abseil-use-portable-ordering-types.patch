@@ -1,0 +1,18 @@
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Subject: [PATCH] abseil: use portable ordering types
+
+The Foundries worker combines modern Clang with an older host libstdc++.
+Abseil's automatic detection sees compiler C++20 support and aliases its
+ordering types to std:: ordering types, but that libstdc++ has no <compare>
+header. Select Abseil's documented C++11-compatible implementation instead.
+This also gives host and target objects the same ordering type configuration.
+
+Upstream-Status: Inappropriate [Foundries host libstdc++ compatibility]
+
+diff --git a/deps/v8/third_party/abseil-cpp/absl/base/options.h b/deps/v8/third_party/abseil-cpp/absl/base/options.h
+index caa92e7..81f230a 100644
+--- a/deps/v8/third_party/abseil-cpp/absl/base/options.h
++++ b/deps/v8/third_party/abseil-cpp/absl/base/options.h
+@@ -204 +204 @@
+-#define ABSL_OPTION_USE_STD_ORDERING 2
++#define ABSL_OPTION_USE_STD_ORDERING 0

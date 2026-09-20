@@ -5,6 +5,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/nodejs:"
 SRC_URI:append:ddkioskbrowser = " \
     file://0001-Use-compatible-CXX20-spelling-for-native-build.patch \
     file://0002-crypto-remove-unused-compare-include.patch \
+    file://0003-abseil-use-portable-ordering-types.patch \
 "
 
 # The Foundries host GCC also lacks C++20 language support needed by Node 22
