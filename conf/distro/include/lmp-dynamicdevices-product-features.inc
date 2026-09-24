@@ -11,8 +11,10 @@ DD_PRODUCT_FEATURES ?= ""
 
 # The kiosk manifest carries its own pinned Chromium and Rust-mixin layers.
 # Limit their provider choices to kiosk builds so this shared distro contract
-# does not alter any existing product's toolchain or recipe selection.
-OVERRIDES:append = "${@':ddkioskbrowser' if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+# does not alter any existing product's toolchain or recipe selection.  The
+# kiosk also uses the upstream DRM/Mesa Etnaviv stack: Chromium's GBM/Wayland
+# path is not compatible with the proprietary Vivante EGL shim on this image.
+OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-etnaviv' if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
 RUSTVERSION:ddkioskbrowser = "1.98.1"
 PREFERRED_VERSION_nativesdk-cargo:ddkioskbrowser = "${RUSTVERSION}"
 PREFERRED_VERSION_nativesdk-libstd-rs:ddkioskbrowser = "${RUSTVERSION}"
@@ -66,7 +68,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
-    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-browser', 'display-runtime kiosk-browser wayland opengl', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-browser', 'display-runtime kiosk-browser wayland opengl etnaviv', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid apparmor wayland opengl vulkan pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \
@@ -103,3 +105,14 @@ python dd_validate_product_features() {
             % " ".join(sorted(display_software))
         )
 }
+
+# Mesa must own the complete userspace graphics API set for Etnaviv.  These
+# preferences override the i.MX machine's proprietary imxgpu provider defaults
+# only when the product-specific dd-graphics-etnaviv override is active.
+PREFERRED_PROVIDER_virtual/egl:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgbm:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgl:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/mesa:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles1:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles2:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles3:dd-graphics-etnaviv = "mesa-gl"

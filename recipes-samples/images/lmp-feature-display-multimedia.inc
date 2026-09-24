@@ -26,7 +26,7 @@ configure_jaguar_screen_weston() {
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
 [core]
 ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'shell=kiosk-shell.so', '', d)}
-use-g2d=true
+${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', 'use-g2d=false', 'use-g2d=true', d)}
 repaint-window=16
 idle-time=0
 
@@ -47,13 +47,19 @@ EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf <<'EOF'
+[Unit]
+# Let the early DRM splash draw first, then stop it deterministically before
+# Weston opens the real display device.
+After=screen-splash.service
+Conflicts=screen-splash.service
+
 [Service]
 WorkingDirectory=/var/rootdirs/home/weston
 ExecStart=
 SupplementaryGroups=render video
 # Weston's debug extension authorises weston-screenshooter. Keep it strictly
 # tied to DEV_MODE/debug-tweaks so production images do not expose capture.
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
+ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} --drm-device=card1 --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
