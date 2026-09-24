@@ -1,7 +1,7 @@
 # Jaguar Screen Chromium kiosk acceptance
 
 This record applies to `imx8mm-jaguar-screen` with
-`DD_PRODUCT_FEATURES = "kiosk-browser"`. Keep the exact manifest revision,
+`DD_PRODUCT_FEATURES = "kiosk-browser audio"`. Keep the exact manifest revision,
 factory target, image checksums, and observed results together. A local parse
 or recipe build does not count as hardware acceptance.
 
@@ -59,6 +59,7 @@ a kiosk test result.
 | Boot | New deployment selected; Weston and `dd-kiosk-browser` active without restart loop | Pending |
 | Render | Fullscreen page fills the panel in the intended orientation; no browser chrome or dialogs | Pending |
 | Touch | Tap, scroll and any required text input work; public input cannot leave the kiosk page | Pending |
+| Audio | Chromium has a Pulse sink input, `wm8524audio` PCM is `RUNNING`, and a DPX play/pause/play capture follows the injected transition without clipping | Pending |
 | Network loss | Remote test URL may show a transient error, but the service stays recoverable | Pending |
 | Network return | NetworkManager dispatcher restarts Chromium and the configured URL loads | Pending |
 | Browser crash | Killing Chromium causes systemd restart without a restore prompt | Pending |
@@ -94,6 +95,15 @@ policy (`ID_INPUT_TOUCHSCREEN`, `WL_OUTPUT`, calibration, and seat when
 present), and fail closed if the virtual endpoint differs. Synthetic input
 starts above the physical controller, bus, IRQ, and kernel driver, so Michael's
 physical acceptance remains mandatory.
+
+The audio investigation found that the `kiosk-browser`-only tuple deliberately
+removed both ALSA and PulseAudio, leaving Chromium with no usable audio backend.
+The corrected Screen kiosk tuple therefore selects `kiosk-browser audio`.
+The kiosk audio drop-in joins the service to the `audio` group, orders it after
+the system PulseAudio service, and points Chromium at the image's Unix socket.
+The Screen machine selects ALSA card `wm8524audio` by stable name, never by the
+observed card index. Target 2995 predates this correction and cannot be the
+audio acceptance image; record the replacement target in the build table.
 
 For the controlled-input check, exercise the panel with touch and a temporary
 USB keyboard. Try taps and scrolling, text entry where the application needs

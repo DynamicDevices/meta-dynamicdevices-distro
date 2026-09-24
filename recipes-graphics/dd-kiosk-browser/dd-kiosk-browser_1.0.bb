@@ -10,10 +10,19 @@ SRC_URI = " \
     file://90-dd-kiosk-browser \
     file://kiosk-policy.json \
 "
+SRC_URI:append = "${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', ' file://dd-kiosk-browser-audio.conf', '', d)}"
 
 S = "${WORKDIR}"
 
 inherit systemd
+
+PACKAGE_ARCH = "${MACHINE_ARCH}"
+
+# Boards with a preferred physical output name it here. Keeping this as a
+# machine override avoids encoding card indices or Screen-specific policy in
+# the generic kiosk launcher.
+DD_KIOSK_AUDIO_CARD ?= ""
+DD_KIOSK_AUDIO_CARD:imx8mm-jaguar-screen = "wm8524audio"
 
 SYSTEMD_SERVICE:${PN} = "dd-kiosk-browser.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
@@ -28,7 +37,17 @@ do_install() {
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser
     install -m 0644 ${WORKDIR}/kiosk-policy.json ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'true', 'false', d)}; then
+        install -d ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d
+        install -m 0644 ${WORKDIR}/dd-kiosk-browser-audio.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf
+    fi
+    if [ -n "${DD_KIOSK_AUDIO_CARD}" ]; then
+        printf '%s\n' \
+            'pcm.!default { type hw; card ${DD_KIOSK_AUDIO_CARD}; device 0; }' \
+            'ctl.!default { type hw; card ${DD_KIOSK_AUDIO_CARD}; }' \
+            > ${D}${sysconfdir}/asound.conf
+    fi
 }
 
 CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
-FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
+FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${sysconfdir}/asound.conf"

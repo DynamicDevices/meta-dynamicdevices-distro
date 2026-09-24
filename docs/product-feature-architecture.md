@@ -49,8 +49,8 @@ DD_PRODUCT_FEATURES = "display flutter godot"
 # Flutter screen
 DD_PRODUCT_FEATURES = "improv flutter"
 
-# Chromium kiosk screen
-DD_PRODUCT_FEATURES = "kiosk-browser"
+# Chromium kiosk screen with host audio
+DD_PRODUCT_FEATURES = "kiosk-browser audio"
 
 # Android screen; currently implemented by Waydroid
 DD_PRODUCT_FEATURES = "improv android-container"
@@ -64,7 +64,9 @@ select their respective UI runtimes and also imply the display runtime.
 launcher, and also implies the display runtime. Its URL is configured in
 `/etc/default/dd-kiosk-browser`; the default is a local provisioning page.
 On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
-become part of the public display. Audio remains an explicit `audio` feature.
+become part of the public display. Audio remains an explicit `audio` feature;
+select it for browser playback so Chromium is built with its audio backend and
+the ALSA/PulseAudio runtime is present.
 The kiosk package installs Chromium managed policies under
 `/etc/chromium/policies/managed`: public users cannot open file pickers,
 downloads, printing, Developer Tools, guest/incognito profiles, or install
