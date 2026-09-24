@@ -8,3 +8,11 @@ PROVIDES:append:dd-graphics-etnaviv = " virtual/egl virtual/libgbm virtual/libgl
 # Mesa is the EGL provider in this configuration, so remove that dependency.
 DEPENDS:remove:dd-graphics-etnaviv = "virtual/egl"
 RRECOMMENDS:mesa-megadriver:append:class-target:dd-graphics-etnaviv = " libdrm-etnaviv mesa-etnaviv-env"
+
+# meta-freescale removes Mesa's KHR headers for every imxgpu machine because
+# the proprietary Vivante provider normally owns them.  This image deliberately
+# replaces that provider, so restore the header required by GLES consumers.
+do_install:append:dd-graphics-etnaviv() {
+    install -d ${D}${includedir}/KHR
+    install -m 0644 ${S}/include/KHR/khrplatform.h ${D}${includedir}/KHR/
+}

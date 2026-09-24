@@ -32,6 +32,14 @@ PREFERRED_VERSION_libgit2-native:ddkioskbrowser = "1.9.7"
 PREFERRED_VERSION_gn-native:ddkioskbrowser = "147.0.7727.116"
 PREFERRED_VERSION_cargo-c-native:ddkioskbrowser = "0.10.25+cargo-0.99.0"
 
+# The LmP 94 Clang toolchain exposes a g-ir-scanner parser failure when the
+# NXP GStreamer 1.26 recipes consume GLib's G_PASTE/__COUNTER__ assertions.
+# The kiosk has no GIR/Python consumer, so omit only the affected generated
+# introspection data while retaining the normal GStreamer runtime libraries.
+GI_DATA_ENABLED:pn-gstreamer1.0:ddkioskbrowser = "False"
+GI_DATA_ENABLED:pn-gstreamer1.0-plugins-base:ddkioskbrowser = "False"
+GI_DATA_ENABLED:pn-gstreamer1.0-plugins-bad:ddkioskbrowser = "False"
+
 DD_PRODUCT_FEATURES_VALID = " \
     alsa \
     android-container \

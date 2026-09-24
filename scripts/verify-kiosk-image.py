@@ -204,6 +204,18 @@ def verify_rootfs(rootfs):
         raise ValueError('rootfs kiosk service lacks Weston ownership or writable state')
     if 'Restart=always' not in service or 'After=weston.service' not in service:
         raise ValueError('rootfs kiosk service lacks restart or compositor ordering')
+    enabled = rootfs / 'etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
+    if not enabled.is_symlink():
+        raise ValueError('rootfs kiosk service is not enabled for startup')
+    launcher = (rootfs / 'usr/bin/dd-kiosk-browser').read_text()
+    for flag in ('--ozone-platform=wayland', '--kiosk'):
+        if flag not in launcher:
+            raise ValueError(f'rootfs kiosk launcher lacks required Chromium flag {flag}')
+    if '--disable-gpu' in launcher:
+        raise ValueError('rootfs kiosk launcher disables GPU acceleration')
+    environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
+    if 'DD_KIOSK_URL=https://active-esl.com' not in environment:
+        raise ValueError('rootfs kiosk URL is not https://active-esl.com')
     weston = (rootfs / 'etc/xdg/weston/weston-screen.ini').read_text()
     if 'shell=kiosk-shell.so' not in weston:
         raise ValueError('rootfs Weston config does not select kiosk shell')
