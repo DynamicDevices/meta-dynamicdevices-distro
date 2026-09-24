@@ -28,13 +28,16 @@ touch handling, network recovery, reboot, or OTA; record those separately.
 
 | Evidence | Value / result |
 | --- | --- |
-| Kiosk manifest commit | Pending |
-| Distro feature commit | Pending |
+| Kiosk manifest commit | `ce04cfa7e6e9cf382114ee4a667c8962ec41e831` |
+| Distro feature commit | `73d88d480886997845667a53f841988add78aaaf` |
+| Jaguar Screen BSP commit | `36db9b8195d0e5cd098d5f1d73c19718d1a4db41` |
 | Factory configuration commit | Pending |
 | Chromium recipe version and layer commit | `chromium-ozone-wayland_147.0.7727.116.bb` at `85eeb6b50883d22c977396f5e8fe211a7961cf2e` |
 | Feature contract negative parses | Separate BitBake parses rejected `kiosk-browser flutter`, kiosk on `imx8mm-jaguar-sentai` without `display-multimedia`, and unknown feature `bogus`; each exited 1 with the intended error |
-| `bitbake chromium-ozone-wayland` | Pending |
-| `bitbake lmp-factory-image` | Pending |
+| Exact changed-component preflight | `bitbake lmp-device-tree -c compile -f`: 871 tasks successful |
+| Foundries platform target | `2995`, exact kiosk trigger/ref/manifest; queued on 2026-09-24, so release-artifact proof remains pending |
+| `bitbake chromium-ozone-wayland` | Passed in the kiosk build lineage; target 2995 remains the exact release gate |
+| `bitbake lmp-factory-image` | Pending target 2995 completion |
 | WIC and OTA artifact names, SHA-256, bytes | Pending |
 | Image manifest includes Chromium, launcher, Weston | Pending |
 | Image manifest excludes Flutter, Godot, Waydroid payloads | Pending |
@@ -66,6 +69,31 @@ Record command output, screenshots, timestamps, and the resulting OSTree
 deployment alongside each result. Check panel rotation and touch coordinates
 together; the kiosk candidate currently uses the base `rotate-90` transform,
 while a separate uncommitted screen edit uses `rotate-270`.
+
+### 2026-09-24 development-board acceptance
+
+The live development board was deliberately hotpatched before the source image
+was available. Michael physically accepted the restored touchscreen mapping:
+native `600x1024` controller geometry with X inversion. Chromium rendered a
+Taylor Swift YouTube video fullscreen and sustained playback well; Michael
+also accepted playback performance. The YouTube consent dialog was handled by
+making keyboard focus visible in a screenshot and selecting the privacy-safe
+`Reject all` choice, followed by one verification capture.
+
+This is strong bench evidence for the source fix and browser runtime, but it is
+not OTA/image acceptance. Keep the reversible hotpatch until target 2995 has
+passed, its exact artifacts and source pins have been verified, and the signed
+image has booted with physical touch and playback rechecked. Only then remove
+the hotpatch and complete the Boot, Touch, Render, Reboot, and OTA rows above.
+
+For development images, `DEV_MODE=1` supplies `debug-tweaks`, which enables
+Weston's `--debug` protocol for bounded screenshot capture. Production images
+omit `--debug`; do not hotpatch or remotely expose it in PROD. Synthetic touch
+tests must clone the deployed device's ABS capabilities and effective udev
+policy (`ID_INPUT_TOUCHSCREEN`, `WL_OUTPUT`, calibration, and seat when
+present), and fail closed if the virtual endpoint differs. Synthetic input
+starts above the physical controller, bus, IRQ, and kernel driver, so Michael's
+physical acceptance remains mandatory.
 
 For the controlled-input check, exercise the panel with touch and a temporary
 USB keyboard. Try taps and scrolling, text entry where the application needs

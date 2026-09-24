@@ -27,6 +27,11 @@ global shipped-product policy rather than product options.
 | Product software | `DD_PRODUCT_FEATURES` | Wayland, Flutter, host audio, Android container |
 | Development access | `IMAGE_FEATURES` | `debug-tweaks`, profiling and test tools |
 
+For the display stack, Factory `DEV_MODE=1` adds `debug-tweaks` and permits
+Weston's `--debug` protocol for development-only capture and diagnosis. A PROD
+build omits that argument. Do not enable the debug protocol at runtime to make
+a production test harness work.
+
 Do not infer a full graphical stack merely because hardware has a display. An
 e-ink product may use its display directly without Wayland or OpenGL.
 
