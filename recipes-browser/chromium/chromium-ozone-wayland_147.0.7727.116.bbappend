@@ -22,9 +22,10 @@ PARALLEL_MAKE = "-j ${DD_CHROMIUM_BUILD_JOBS}"
 do_compile:prepend() {
     dd_chromium_cpus="$(getconf _NPROCESSORS_ONLN)"
     dd_chromium_memory_kib="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+    dd_chromium_physical_memory_bytes="$(awk '/^MemTotal:/ { printf "%.0f", $2 * 1024 }' /proc/meminfo)"
     dd_chromium_memory_limit="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)"
     if [ "$dd_chromium_memory_limit" = "max" ]; then
-        dd_chromium_memory_limit="$((dd_chromium_memory_kib * 1024))"
+        dd_chromium_memory_limit="$dd_chromium_physical_memory_bytes"
     fi
 
     bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus min_cpus=${DD_CHROMIUM_MIN_CPUS} memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit min_memory_bytes=${DD_CHROMIUM_MIN_MEMORY_BYTES}"
