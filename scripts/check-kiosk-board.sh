@@ -27,6 +27,27 @@ esac
 service_state weston.service
 service_state dd-kiosk-browser.service
 service_state NetworkManager.service
+printf 'cross-deployment linker cache: '
+if /sbin/ldconfig -p 2>/dev/null | grep -q '/ostree/deploy/.*/usr/lib'; then
+    echo present
+    failed=1
+else
+    echo absent
+fi
+for service in weston.service dd-kiosk-browser.service; do
+    printf '%s rollback library maps: ' "$service"
+    cgroup=$(systemctl show "$service" --property=ControlGroup --value 2>/dev/null || true)
+    count=0
+    if [ -n "$cgroup" ] && [ -r "/sys/fs/cgroup$cgroup/cgroup.procs" ]; then
+        for pid in $(cat "/sys/fs/cgroup$cgroup/cgroup.procs"); do
+            [ -r "/proc/$pid/maps" ] || continue
+            matches=$(grep -c '/ostree/deploy/.*/usr/lib' "/proc/$pid/maps" 2>/dev/null || true)
+            count=$((count + matches))
+        done
+    fi
+    echo "$count"
+    [ "$count" -eq 0 ] || failed=1
+done
 service_user=$(systemctl show dd-kiosk-browser.service --property=User --value 2>/dev/null || true)
 printf 'kiosk service user: %s\n' "${service_user:-unknown}"
 [ "$service_user" = weston ] || failed=1

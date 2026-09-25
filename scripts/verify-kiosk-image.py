@@ -23,12 +23,15 @@ FORBIDDEN_PREFIXES = (
 ARTIFACT_FILES = (
     '/usr/bin/chromium',
     '/usr/bin/dd-kiosk-browser',
+    '/usr/libexec/dd-kiosk-linker-guard',
     '/etc/default/dd-kiosk-browser',
     '/etc/chromium/policies/managed/dd-kiosk-browser.json',
     '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
     '/etc/xdg/weston/weston-screen.ini',
     '/etc/systemd/system/weston.service.d/screen.conf',
     '/usr/share/dd-kiosk-browser/offline.html',
+    '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
+    '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
 )
 
 
@@ -182,12 +185,15 @@ def verify_rootfs(rootfs):
     required = (
         'usr/bin/chromium',
         'usr/bin/dd-kiosk-browser',
+        'usr/libexec/dd-kiosk-linker-guard',
         'etc/default/dd-kiosk-browser',
         'etc/chromium/policies/managed/dd-kiosk-browser.json',
         'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
         'etc/xdg/weston/weston-screen.ini',
         'etc/systemd/system/weston.service.d/screen.conf',
         'usr/share/dd-kiosk-browser/offline.html',
+        'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
+        'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
     )
     missing = [path for path in required if not (rootfs / path).is_file()]
     if missing:
@@ -213,6 +219,17 @@ def verify_rootfs(rootfs):
             raise ValueError(f'rootfs kiosk launcher lacks required Chromium flag {flag}')
     if '--disable-gpu' in launcher:
         raise ValueError('rootfs kiosk launcher disables GPU acceleration')
+    linker_guard = (rootfs / 'usr/libexec/dd-kiosk-linker-guard').read_text()
+    for contract in ('kiosk-audio-hotpatch.conf', 'zz-audio-hotpatch.conf',
+                     '/sbin/ldconfig', '/ostree/deploy/'):
+        if contract not in linker_guard:
+            raise ValueError(f'rootfs linker guard lacks migration contract {contract}')
+    native_runtime = (rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf').read_text()
+    if 'UnsetEnvironment=LD_LIBRARY_PATH' not in native_runtime:
+        raise ValueError('rootfs kiosk runtime does not clear legacy library overrides')
+    weston_guard = (rootfs / 'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf').read_text()
+    if 'ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard' not in weston_guard:
+        raise ValueError('rootfs Weston service does not gate mixed-deployment linkage')
     environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
     if 'DD_KIOSK_URL=https://active-esl.com' not in environment:
         raise ValueError('rootfs kiosk URL is not https://active-esl.com')

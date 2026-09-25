@@ -35,9 +35,9 @@ touch handling, network recovery, reboot, or OTA; record those separately.
 | Chromium recipe version and layer commit | `chromium-ozone-wayland_147.0.7727.116.bb` at `85eeb6b50883d22c977396f5e8fe211a7961cf2e` |
 | Feature contract negative parses | Separate BitBake parses rejected `kiosk-browser flutter`, kiosk on `imx8mm-jaguar-sentai` without `display-multimedia`, and unknown feature `bogus`; each exited 1 with the intended error |
 | Exact changed-component preflight | `bitbake lmp-device-tree -c compile -f`: 871 tasks successful |
-| Foundries platform target | `2995`, exact kiosk trigger/ref/manifest; queued on 2026-09-24, so release-artifact proof remains pending |
-| `bitbake chromium-ozone-wayland` | Passed in the kiosk build lineage; target 2995 remains the exact release gate |
-| `bitbake lmp-factory-image` | Pending target 2995 completion |
+| Foundries platform target | `2998`, signed manifest `951a1a538cea6f1bc04fb06d71e7d9dcbe497754`, distro `97499cec6a151a9898ccdcea491a30d4e0757ee7`; startup validation entered the real container workload, so release-artifact proof remains pending |
+| `bitbake chromium-ozone-wayland` | Exact `bitbake -e` preflight passed; target 2998 remains the release gate |
+| `bitbake lmp-factory-image` | Pending target 2998 completion |
 | WIC and OTA artifact names, SHA-256, bytes | Pending |
 | Image manifest includes Chromium, launcher, Weston | Pending |
 | Image manifest excludes Flutter, Godot, Waydroid payloads | Pending |
@@ -82,7 +82,7 @@ making keyboard focus visible in a screenshot and selecting the privacy-safe
 `Reject all` choice, followed by one verification capture.
 
 This is strong bench evidence for the source fix and browser runtime, but it is
-not OTA/image acceptance. Keep the reversible hotpatch until target 2995 has
+not OTA/image acceptance. Keep the reversible hotpatch until target 2998 has
 passed, its exact artifacts and source pins have been verified, and the signed
 image has booted with physical touch and playback rechecked. Only then remove
 the hotpatch and complete the Boot, Touch, Render, Reboot, and OTA rows above.
@@ -103,7 +103,19 @@ The kiosk audio drop-in joins the service to the `audio` group, orders it after
 the system PulseAudio service, and points Chromium at the image's Unix socket.
 The Screen machine selects ALSA card `wm8524audio` by stable name, never by the
 observed card index. Target 2995 predates this correction and cannot be the
-audio acceptance image; record the replacement target in the build table.
+audio acceptance image; target 2998 is the replacement build gate.
+
+### OSTree hotpatch isolation
+
+Do not add another OSTree deployment's `/usr/lib`, PulseAudio directory, or
+ALSA plugin directory to global `ld.so.conf` or a broad service
+`LD_LIBRARY_PATH`. Target 2991 demonstrated why: Weston loaded current
+`libg2d`/`libGAL` together with rollback `libweston`/`libEGL`/`libgbm`, so G2D
+opened successfully but compositor-backend creation failed on every reboot.
+The kiosk package now runs a fail-closed linker guard before Weston, migrates
+the two named development hotpatches, and restores the native packaged browser
+launcher. Acceptance requires zero `/ostree/deploy/.../usr/lib` entries in
+`ldconfig -p` and zero such mappings in the Weston and browser cgroups.
 
 For the controlled-input check, exercise the panel with touch and a temporary
 USB keyboard. Try taps and scrolling, text entry where the application needs

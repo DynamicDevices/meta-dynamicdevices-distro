@@ -9,6 +9,9 @@ SRC_URI = " \
     file://offline.html \
     file://90-dd-kiosk-browser \
     file://kiosk-policy.json \
+    file://dd-kiosk-linker-guard \
+    file://weston-linker-guard.conf \
+    file://dd-kiosk-native-runtime.conf \
 "
 SRC_URI:append = "${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', ' file://dd-kiosk-browser-audio.conf', '', d)}"
 
@@ -30,13 +33,16 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 RDEPENDS:${PN} = "chromium-ozone-wayland networkmanager-daemon"
 
 do_install() {
-    install -d ${D}${bindir} ${D}${systemd_system_unitdir} ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d ${D}${sysconfdir}/chromium/policies/managed
+    install -d ${D}${bindir} ${D}${libexecdir} ${D}${systemd_system_unitdir} ${D}${systemd_system_unitdir}/weston.service.d ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d ${D}${sysconfdir}/chromium/policies/managed
     install -m 0755 ${WORKDIR}/dd-kiosk-browser ${D}${bindir}/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.service ${D}${systemd_system_unitdir}/dd-kiosk-browser.service
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.env ${D}${sysconfdir}/default/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser
     install -m 0644 ${WORKDIR}/kiosk-policy.json ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
+    install -m 0755 ${WORKDIR}/dd-kiosk-linker-guard ${D}${libexecdir}/dd-kiosk-linker-guard
+    install -m 0644 ${WORKDIR}/weston-linker-guard.conf ${D}${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf
+    install -m 0644 ${WORKDIR}/dd-kiosk-native-runtime.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf
     if ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'true', 'false', d)}; then
         install -d ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d
         install -m 0644 ${WORKDIR}/dd-kiosk-browser-audio.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf
@@ -50,4 +56,4 @@ do_install() {
 }
 
 CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
-FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${sysconfdir}/asound.conf"
+FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${libexecdir}/dd-kiosk-linker-guard ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf ${sysconfdir}/asound.conf"
