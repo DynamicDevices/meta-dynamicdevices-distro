@@ -15,26 +15,28 @@ do_compile[file-checksums] += "${DD_CHROMIUM_GBM_PATCH}:True"
 # task into a nine-hour timeout, and record the effective resources in the
 # normal task log for every build.
 DD_CHROMIUM_BUILD_JOBS ?= "32"
-DD_CHROMIUM_MIN_CPUS ?= "16"
-DD_CHROMIUM_MIN_MEMORY_KIB ?= "67108864"
+DD_CHROMIUM_MIN_CPUS ?= "32"
+DD_CHROMIUM_MIN_MEMORY_BYTES ?= "48000000000"
 PARALLEL_MAKE = "-j ${DD_CHROMIUM_BUILD_JOBS}"
 
 do_compile:prepend() {
     dd_chromium_cpus="$(getconf _NPROCESSORS_ONLN)"
     dd_chromium_memory_kib="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+    dd_chromium_memory_limit="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)"
+    if [ "$dd_chromium_memory_limit" = "max" ]; then
+        dd_chromium_memory_limit="$((dd_chromium_memory_kib * 1024))"
+    fi
 
-    bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus min_cpus=${DD_CHROMIUM_MIN_CPUS} memory_kib=$dd_chromium_memory_kib min_memory_kib=${DD_CHROMIUM_MIN_MEMORY_KIB}"
+    bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus min_cpus=${DD_CHROMIUM_MIN_CPUS} memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit min_memory_bytes=${DD_CHROMIUM_MIN_MEMORY_BYTES}"
     bbnote "DD Chromium CPU affinity: $(awk '/^Cpus_allowed_list:/ { print $2 }' /proc/self/status)"
     bbnote "DD Chromium load: $(cat /proc/loadavg)"
     bbnote "DD Chromium cgroup CPU limit: $(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unavailable)"
-    bbnote "DD Chromium cgroup memory limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo unavailable)"
-    df -h "${TMPDIR}"
 
     if [ "$dd_chromium_cpus" -lt "${DD_CHROMIUM_MIN_CPUS}" ]; then
         bbfatal "Chromium requires at least ${DD_CHROMIUM_MIN_CPUS} online CPUs; worker exposes $dd_chromium_cpus"
     fi
-    if [ "$dd_chromium_memory_kib" -lt "${DD_CHROMIUM_MIN_MEMORY_KIB}" ]; then
-        bbfatal "Chromium requires at least ${DD_CHROMIUM_MIN_MEMORY_KIB} KiB RAM; worker exposes $dd_chromium_memory_kib KiB"
+    if [ "$dd_chromium_memory_limit" -lt "${DD_CHROMIUM_MIN_MEMORY_BYTES}" ]; then
+        bbfatal "Chromium requires at least ${DD_CHROMIUM_MIN_MEMORY_BYTES} bytes of cgroup memory; worker exposes $dd_chromium_memory_limit bytes"
     fi
 
     if ! grep -Fq '#include <gbm.h>' "${S}/ui/gl/gl_surface_egl.cc"; then
