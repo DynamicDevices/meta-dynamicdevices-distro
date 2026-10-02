@@ -12,27 +12,42 @@ import sys
 import tarfile
 import tempfile
 
-REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston',
-            'networkmanager-daemon', 'packagegroup-dd-kiosk-browser'}
+COMMON_REQUIRED = {'weston', 'networkmanager-daemon',
+                   'packagegroup-dd-kiosk-browser'}
+PROVIDER_REQUIRED = {
+    'chromium': {'chromium-ozone-wayland', 'dd-kiosk-browser'},
+    'cog': {'cog', 'wpewebkit', 'wpebackend-fdo', 'dd-kiosk-cog'},
+}
+PROVIDER_RUNTIME = {
+    'chromium': 'dd-kiosk-browser',
+    'cog': 'dd-kiosk-cog',
+}
 FORBIDDEN_PREFIXES = (
     'waydroid', 'packagegroup-dd-android-container',
     'screen-flutter-demo', 'flutter', 'libflutter',
     'packagegroup-dd-flutter', 'ivi-homescreen',
     'godot', 'screen-godot-smoke', 'screen-aero-demo',
 )
-ARTIFACT_FILES = (
-    '/usr/bin/chromium',
+COMMON_ARTIFACT_FILES = (
     '/usr/bin/dd-kiosk-browser',
     '/usr/libexec/dd-kiosk-linker-guard',
     '/etc/default/dd-kiosk-browser',
-    '/etc/chromium/policies/managed/dd-kiosk-browser.json',
+    '/etc/asound.conf',
     '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
     '/etc/xdg/weston/weston-screen.ini',
     '/etc/systemd/system/weston.service.d/screen.conf',
     '/usr/share/dd-kiosk-browser/offline.html',
     '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
+    '/usr/lib/systemd/system/dd-kiosk-browser.service.d/audio.conf',
     '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
 )
+PROVIDER_ARTIFACT_FILES = {
+    'chromium': (
+        '/usr/bin/chromium',
+        '/etc/chromium/policies/managed/dd-kiosk-browser.json',
+    ),
+    'cog': ('/usr/bin/cog',),
+}
 
 
 def packages(path):
@@ -41,6 +56,36 @@ def packages(path):
         if line.strip():
             result.add(line.split()[0])
     return result
+
+
+def kiosk_provider(package_set):
+    providers = [name for name, runtime in PROVIDER_RUNTIME.items()
+                 if runtime in package_set]
+    if len(providers) != 1:
+        raise ValueError(
+            'candidate must contain exactly one kiosk runtime; found '
+            f'{providers or "none"}'
+        )
+    return providers[0]
+
+
+def artifact_files(provider):
+    return COMMON_ARTIFACT_FILES + PROVIDER_ARTIFACT_FILES[provider]
+
+
+def required_packages(provider):
+    return COMMON_REQUIRED | PROVIDER_REQUIRED[provider]
+
+
+def forbidden_packages(package_set, provider):
+    other_provider_packages = set().union(
+        *(packages for name, packages in PROVIDER_REQUIRED.items()
+          if name != provider)
+    )
+    return {
+        name for name in package_set
+        if name.startswith(FORBIDDEN_PREFIXES) or name in other_provider_packages
+    }
 
 
 def sha256(path):
@@ -63,7 +108,7 @@ def verify_compressed(path, opener, label):
         raise ValueError(f'{label} failed integrity check: {exc}') from exc
 
 
-def verify_ota_ext4(path):
+def verify_ota_ext4(path, provider):
     """Inspect the shipped filesystem, not only BitBake's staging rootfs."""
     if shutil.which('debugfs') is None:
         raise ValueError('debugfs is required to inspect the OTA ext4 artifact')
@@ -100,7 +145,8 @@ def verify_ota_ext4(path):
         units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
                  '/lib/systemd/system/dd-kiosk-browser.service')
         for deployment in deployments:
-            missing = [name for name in ARTIFACT_FILES if not has_file(image, deployment + name)]
+            missing = [name for name in artifact_files(provider)
+                       if not has_file(image, deployment + name)]
             if not any(has_file(image, deployment + name) for name in units):
                 missing.append('dd-kiosk-browser.service')
             if missing:
@@ -109,10 +155,10 @@ def verify_ota_ext4(path):
     return {deployment.lstrip('/') for deployment in deployments}
 
 
-def verify_ota_tar(path, deployments):
+def verify_ota_tar(path, deployments, provider):
     """Check the separate OTA tar ships the same named deployment payload."""
     required = {f'{deployment}{name}' for deployment in deployments
-                for name in ARTIFACT_FILES}
+                for name in artifact_files(provider)}
     units = {deployment: {f'{deployment}/usr/lib/systemd/system/dd-kiosk-browser.service',
                           f'{deployment}/lib/systemd/system/dd-kiosk-browser.service'}
              for deployment in deployments}
@@ -181,20 +227,8 @@ def verify_wic_partitions(wic_gz, ota_gz):
     print(f'WIC boot FAT and OTA root copy: verified in {wic_gz}')
 
 
-def verify_rootfs(rootfs):
-    required = (
-        'usr/bin/chromium',
-        'usr/bin/dd-kiosk-browser',
-        'usr/libexec/dd-kiosk-linker-guard',
-        'etc/default/dd-kiosk-browser',
-        'etc/chromium/policies/managed/dd-kiosk-browser.json',
-        'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
-        'etc/xdg/weston/weston-screen.ini',
-        'etc/systemd/system/weston.service.d/screen.conf',
-        'usr/share/dd-kiosk-browser/offline.html',
-        'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
-        'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
-    )
+def verify_rootfs(rootfs, provider):
+    required = tuple(path.lstrip('/') for path in artifact_files(provider))
     missing = [path for path in required if not (rootfs / path).is_file()]
     if missing:
         raise ValueError(f'rootfs missing files: {missing}')
@@ -214,9 +248,15 @@ def verify_rootfs(rootfs):
     if not enabled.is_symlink():
         raise ValueError('rootfs kiosk service is not enabled for startup')
     launcher = (rootfs / 'usr/bin/dd-kiosk-browser').read_text()
-    for flag in ('--ozone-platform=wayland', '--kiosk'):
+    provider_flags = {
+        'chromium': ('--ozone-platform=wayland', '--kiosk'),
+        'cog': ('--platform=wl', '--webprocess-failure=restart'),
+    }
+    for flag in provider_flags[provider]:
         if flag not in launcher:
-            raise ValueError(f'rootfs kiosk launcher lacks required Chromium flag {flag}')
+            raise ValueError(
+                f'rootfs {provider} launcher lacks required flag {flag}'
+            )
     if '--disable-gpu' in launcher:
         raise ValueError('rootfs kiosk launcher disables GPU acceleration')
     linker_guard = (rootfs / 'usr/libexec/dd-kiosk-linker-guard').read_text()
@@ -243,28 +283,43 @@ def verify_rootfs(rootfs):
         raise ValueError('rootfs Weston service does not select candidate screen config')
     if not any(path.is_file() for path in rootfs.rglob('kiosk-shell.so')):
         raise ValueError('rootfs lacks Weston kiosk-shell.so module')
-    policy_path = rootfs / 'etc/chromium/policies/managed/dd-kiosk-browser.json'
-    policy = json.loads(policy_path.read_text())
-    expected_policy = {
-        'AllowFileSelectionDialogs': False,
-        'BrowserAddPersonEnabled': False,
-        'BrowserGuestModeEnabled': False,
-        'BrowserSignin': 0,
-        'DeveloperToolsAvailability': 2,
-        'DownloadRestrictions': 3,
-        'ExtensionInstallBlocklist': ['*'],
-        'IncognitoModeAvailability': 1,
-        'PrintingEnabled': False,
-        'URLBlocklist': ['view-source:*'],
-    }
-    for name, value in expected_policy.items():
-        if policy.get(name) != value:
-            raise ValueError(f'rootfs Chromium policy {name} does not match kiosk contract')
-    for executable in ('usr/bin/chromium', 'usr/bin/dd-kiosk-browser',
-                       'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser'):
+    audio = (rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/audio.conf').read_text()
+    for contract in ('After=pulseaudio.service',
+                     'PULSE_SERVER=unix:/tmp/pulseaudio.socket'):
+        if contract not in audio:
+            raise ValueError(f'rootfs kiosk audio drop-in lacks {contract}')
+    asound = (rootfs / 'etc/asound.conf').read_text()
+    if 'card tas2555audio' not in asound:
+        raise ValueError('rootfs ALSA default is not the Jaguar Screen TAS2555 card')
+
+    if provider == 'chromium':
+        policy_path = rootfs / 'etc/chromium/policies/managed/dd-kiosk-browser.json'
+        policy = json.loads(policy_path.read_text())
+        expected_policy = {
+            'AllowFileSelectionDialogs': False,
+            'BrowserAddPersonEnabled': False,
+            'BrowserGuestModeEnabled': False,
+            'BrowserSignin': 0,
+            'DeveloperToolsAvailability': 2,
+            'DownloadRestrictions': 3,
+            'ExtensionInstallBlocklist': ['*'],
+            'IncognitoModeAvailability': 1,
+            'PrintingEnabled': False,
+            'URLBlocklist': ['view-source:*'],
+        }
+        for name, value in expected_policy.items():
+            if policy.get(name) != value:
+                raise ValueError(
+                    f'rootfs Chromium policy {name} does not match kiosk contract'
+                )
+
+    executables = ('usr/bin/dd-kiosk-browser',
+                   'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
+                   f'usr/bin/{"chromium" if provider == "chromium" else "cog"}')
+    for executable in executables:
         if not (rootfs / executable).stat().st_mode & 0o111:
             raise ValueError(f'rootfs file is not executable: {executable}')
-    print(f'rootfs payload and kiosk service: verified at {rootfs}')
+    print(f'rootfs {provider} payload and kiosk service: verified at {rootfs}')
 
 
 def main():
@@ -286,12 +341,13 @@ def main():
             p.error(f'--{name.replace("_", "-")} must be positive')
     if not args.rootfs.is_dir():
         p.error(f'--rootfs does not name a directory: {args.rootfs}')
-    try:
-        verify_rootfs(args.rootfs)
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
-        p.error(str(exc))
     candidate = packages(args.candidate_manifest)
     baseline = packages(args.baseline_manifest)
+    try:
+        provider = kiosk_provider(candidate)
+        verify_rootfs(args.rootfs, provider)
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        p.error(str(exc))
     if not args.candidate_wic_gz.name.endswith('.wic.gz'):
         p.error('candidate_wic_gz must be a .wic.gz image artifact')
     if not args.ota_ext4_gz.name.endswith('.ota-ext4.gz'):
@@ -308,15 +364,17 @@ def main():
         except ValueError as exc:
             p.error(str(exc))
     try:
-        deployments = verify_ota_ext4(args.ota_ext4_gz)
-        verify_ota_tar(args.ota_tar_xz, deployments)
+        deployments = verify_ota_ext4(args.ota_ext4_gz, provider)
+        verify_ota_tar(args.ota_tar_xz, deployments, provider)
         verify_wic_partitions(args.candidate_wic_gz, args.ota_ext4_gz)
     except (ValueError, OSError, tarfile.TarError) as exc:
         p.error(str(exc))
-    missing = sorted(REQUIRED - candidate)
-    forbidden = sorted(x for x in candidate if x.startswith(FORBIDDEN_PREFIXES))
+    required = required_packages(provider)
+    missing = sorted(required - candidate)
+    forbidden = sorted(forbidden_packages(candidate, provider))
     size = args.candidate_wic_gz.stat().st_size
     delta = size - args.baseline_wic_gz_bytes
+    print(f'kiosk provider: {provider}')
     print(f'candidate packages: {len(candidate)}; deployed baseline: {len(baseline)}')
     print(f'added: {len(candidate - baseline)}; removed: {len(baseline - candidate)}')
     print(f'WIC gzip: {size:,} bytes; deployed baseline: {args.baseline_wic_gz_bytes:,} bytes; delta: {delta:+,} bytes ({delta / args.baseline_wic_gz_bytes:+.1%})')

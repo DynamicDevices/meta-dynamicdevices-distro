@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+case "${2:-}" in
+    up)
+        systemctl --no-block try-restart dd-kiosk-browser.service
+        ;;
+    connectivity-change)
+        case "${CONNECTIVITY_STATE:-}" in
+            FULL|full) systemctl --no-block try-restart dd-kiosk-browser.service ;;
+        esac
+        ;;
+esac

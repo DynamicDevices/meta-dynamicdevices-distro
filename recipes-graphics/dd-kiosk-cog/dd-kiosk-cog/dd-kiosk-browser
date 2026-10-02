@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+
+url=${DD_KIOSK_URL:-file:///usr/share/dd-kiosk-browser/offline.html}
+state_dir=${STATE_DIRECTORY:-/var/lib/dd-kiosk-browser}
+runtime_dir=/run/user/$(id -u)
+
+case "$url" in
+    http://*) location=${url#http://} ;;
+    https://*) location=${url#https://} ;;
+    file:///*) location=${url#file://} ;;
+    *) echo "DD_KIOSK_URL must be an HTTP(S) or absolute file URL" >&2; exit 1 ;;
+esac
+
+case "$url" in
+    http://*|https://*)
+        authority=${location%%[/?#]*}
+        case "$authority" in
+            ''|:*|*[[:space:]]*) echo "DD_KIOSK_URL must name an HTTP(S) host" >&2; exit 1 ;;
+        esac
+        ;;
+esac
+
+if [ ! -x /usr/bin/cog ]; then
+    echo "Cog executable is not installed" >&2
+    exit 1
+fi
+
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in "$runtime_dir"/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="$runtime_dir"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export GDK_BACKEND=wayland
+        export HOME="$state_dir"
+        export XDG_CACHE_HOME="$state_dir/cache"
+        export XDG_CONFIG_HOME="$state_dir/config"
+        export COG_PLATFORM_NAME=wl
+        export COG_PLATFORM_WL_VIEW_FULLSCREEN=1
+        export LC_ALL=C
+        # Replace the launcher so systemd supervises Cog and its exit status.
+        # shellcheck disable=SC2093
+        exec /usr/bin/cog --platform=wl --webprocess-failure=restart "$url"
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available for the weston user" >&2
+exit 1

@@ -14,7 +14,41 @@ DD_PRODUCT_FEATURES ?= ""
 # does not alter any existing product's toolchain or recipe selection.  The
 # kiosk also uses the upstream DRM/Mesa Etnaviv stack: Chromium's GBM/Wayland
 # path is not compatible with the proprietary Vivante EGL shim on this image.
-OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-etnaviv' if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+OVERRIDES:append = "${@':ddkioskbrowser' if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+OVERRIDES:append = "${@':ddkioskcog' if 'kiosk-cog' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+OVERRIDES:append = "${@':dd-graphics-etnaviv' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'kiosk-browser', 'kiosk-cog'} else ''}"
+
+# meta-webkit is pinned in the manifest but its recipes must be invisible to
+# every existing product tuple.  Expose the layer only for the explicit Cog
+# feature.  Remove its collection as well as masking its files for other
+# products so BitBake does not report an enabled-but-empty layer.  Keep
+# dangling appends fatal despite the layer's relaxed default.
+BBMASK += "${@'' if 'kiosk-cog' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else 'meta-webkit/'}"
+BBFILE_COLLECTIONS:remove = "${@'' if 'kiosk-cog' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else 'webkit'}"
+BB_DANGLINGAPPENDS_WARNONLY = "false"
+
+PREFERRED_VERSION_cog:ddkioskcog = "0.18.5"
+PREFERRED_VERSION_wpewebkit:ddkioskcog = "2.46.7"
+PREFERRED_VERSION_libwpe:ddkioskcog = "1.16.2"
+PREFERRED_VERSION_wpebackend-fdo:ddkioskcog = "1.14.4"
+PREFERRED_PROVIDER_virtual/wpebackend:ddkioskcog = "wpebackend-fdo"
+PACKAGECONFIG:pn-cog:ddkioskcog = "wl"
+PACKAGECONFIG:pn-wpewebkit:ddkioskcog = " \
+    dfg-jit \
+    gbm \
+    gst_gl \
+    jit \
+    journald \
+    mediasource \
+    openjpeg \
+    remote-inspector \
+    service-worker \
+    unified-builds \
+    video \
+    webaudio \
+    webcrypto \
+    woff2 \
+"
 RUSTVERSION:ddkioskbrowser = "1.98.1"
 PREFERRED_VERSION_nativesdk-cargo:ddkioskbrowser = "${RUSTVERSION}"
 PREFERRED_VERSION_nativesdk-libstd-rs:ddkioskbrowser = "${RUSTVERSION}"
@@ -46,6 +80,7 @@ DD_PRODUCT_FEATURES_VALID = " \
     audio \
     auto-register \
     kiosk-browser \
+    kiosk-cog \
     cra-audit \
     display \
     flutter \
@@ -61,7 +96,7 @@ DD_PRODUCT_FEATURES_VALID = " \
 DISTRO_FEATURES:remove = " \
     x11 directfb \
     ${@'' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else 'vulkan'} \
-    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container', 'kiosk-browser'} else 'wayland opengl'} \
+    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container', 'kiosk-browser', 'kiosk-cog'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'android-container'} else 'alsa'} \
 "
@@ -77,6 +112,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-browser', 'display-runtime kiosk-browser wayland opengl etnaviv', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-cog', 'display-runtime kiosk-browser wayland opengl etnaviv', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid apparmor wayland opengl vulkan pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \
@@ -97,14 +133,23 @@ python dd_validate_product_features() {
             % (" ".join(unknown), " ".join(sorted(valid)))
         )
 
+    kiosk_features = selected & {"kiosk-browser", "kiosk-cog"}
     other_display_apps = selected & {"flutter", "godot", "android-container"}
-    if "kiosk-browser" in selected and other_display_apps:
+    if len(kiosk_features) > 1:
         bb.fatal(
-            "kiosk-browser owns the display and cannot be combined with %s"
-            % " ".join(sorted(other_display_apps))
+            "Only one kiosk browser feature may be selected: %s"
+            % " ".join(sorted(kiosk_features))
+        )
+    if kiosk_features and other_display_apps:
+        bb.fatal(
+            "%s owns the display and cannot be combined with %s"
+            % (" ".join(sorted(kiosk_features)),
+               " ".join(sorted(other_display_apps)))
         )
 
-    display_software = selected & {"display", "flutter", "godot", "kiosk-browser"}
+    display_software = selected & {
+        "display", "flutter", "godot", "kiosk-browser", "kiosk-cog"
+    }
     machine_features = set((e.data.getVar("MACHINE_FEATURES") or "").split())
     if display_software and "display-multimedia" not in machine_features:
         bb.fatal(

@@ -54,22 +54,63 @@ printf 'kiosk service user: %s\n' "${service_user:-unknown}"
 state_owner=$(stat -c %U /var/lib/dd-kiosk-browser 2>/dev/null || true)
 printf 'kiosk state owner: %s\n' "${state_owner:-missing}"
 [ "$state_owner" = weston ] || failed=1
-printf 'chromium kiosk process: '
-browser_flags=absent
-for pid in $(pgrep -f chromium-bin || true); do
-    [ -r "/proc/$pid/cmdline" ] || continue
-    command_line=$(tr '\000' ' ' < "/proc/$pid/cmdline")
-    case "$command_line" in
-        *" --ozone-platform=wayland "*) ;;
-        *) continue ;;
-    esac
-    case "$command_line" in
-        *" --kiosk "*) browser_flags=present; break ;;
-    esac
-done
-printf '%s\n' "$browser_flags"
-[ "$browser_flags" = present ] || failed=1
-printf 'kiosk policy: '; if test -r /etc/chromium/policies/managed/dd-kiosk-browser.json; then echo present; else echo absent; failed=1; fi
+kiosk_provider=unknown
+if command -v rpm >/dev/null 2>&1 && rpm -q dd-kiosk-cog >/dev/null 2>&1; then
+    kiosk_provider=cog
+elif command -v rpm >/dev/null 2>&1 && rpm -q dd-kiosk-browser >/dev/null 2>&1; then
+    kiosk_provider=chromium
+elif [ -x /usr/bin/cog ] && [ ! -x /usr/bin/chromium ]; then
+    kiosk_provider=cog
+elif [ -x /usr/bin/chromium ]; then
+    kiosk_provider=chromium
+fi
+printf 'kiosk provider: %s\n' "$kiosk_provider"
+
+case "$kiosk_provider" in
+    chromium)
+        printf 'chromium kiosk process: '
+        browser_flags=absent
+        for pid in $(pgrep -f chromium-bin || true); do
+            [ -r "/proc/$pid/cmdline" ] || continue
+            command_line=$(tr '\000' ' ' < "/proc/$pid/cmdline")
+            case "$command_line" in
+                *" --ozone-platform=wayland "*) ;;
+                *) continue ;;
+            esac
+            case "$command_line" in
+                *" --kiosk "*) browser_flags=present; break ;;
+            esac
+        done
+        printf '%s\n' "$browser_flags"
+        [ "$browser_flags" = present ] || failed=1
+        printf 'kiosk policy: '
+        if test -r /etc/chromium/policies/managed/dd-kiosk-browser.json; then
+            echo present
+        else
+            echo absent
+            failed=1
+        fi
+        ;;
+    cog)
+        printf 'cog Wayland process: '
+        cog_flags=absent
+        for pid in $(pgrep -x cog || true); do
+            [ -r "/proc/$pid/cmdline" ] || continue
+            command_line=$(tr '\000' ' ' < "/proc/$pid/cmdline")
+            case "$command_line" in
+                *" --platform=wl "*" --webprocess-failure=restart "*)
+                    cog_flags=present
+                    break
+                    ;;
+            esac
+        done
+        printf '%s\n' "$cog_flags"
+        [ "$cog_flags" = present ] || failed=1
+        ;;
+    *)
+        failed=1
+        ;;
+esac
 weston_uid=$(id -u weston)
 printf 'wayland socket: '; if grep -Fq "/run/user/$weston_uid/wayland-" /proc/net/unix; then echo present; else echo absent; failed=1; fi
 exit "$failed"

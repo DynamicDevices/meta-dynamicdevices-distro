@@ -5,6 +5,6 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 inherit packagegroup
 
-DD_KIOSK_BROWSER_RUNTIME ?= "dd-kiosk-browser"
+DD_KIOSK_BROWSER_RUNTIME ?= "${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-cog', 'dd-kiosk-cog', 'dd-kiosk-browser', d)}"
 
 RDEPENDS:${PN} = "${DD_KIOSK_BROWSER_RUNTIME}"

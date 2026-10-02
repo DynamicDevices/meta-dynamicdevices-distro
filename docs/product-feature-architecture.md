@@ -52,6 +52,9 @@ DD_PRODUCT_FEATURES = "improv flutter"
 # Chromium kiosk screen with host audio
 DD_PRODUCT_FEATURES = "kiosk-browser audio"
 
+# Cog/WPE WebKit test kiosk with host audio
+DD_PRODUCT_FEATURES = "kiosk-cog audio"
+
 # Android screen; currently implemented by Waydroid
 DD_PRODUCT_FEATURES = "improv android-container"
 ```
@@ -63,6 +66,17 @@ select their respective UI runtimes and also imply the display runtime.
 `kiosk-browser` selects Chromium Ozone Wayland and a Weston-owned fullscreen
 launcher, and also implies the display runtime. Its URL is configured in
 `/etc/default/dd-kiosk-browser`; the default is a local provisioning page.
+`kiosk-cog` selects Cog with WPE WebKit behind the same provider-neutral kiosk
+packagegroup and Weston kiosk shell. It exists for comparative build,
+rendering, touch, audio and video tests while Chromium CI is being repaired.
+Cog is intentionally a small single-view embedded web application container,
+but this integration does not implement the Chromium managed-policy contract.
+Do not promote `kiosk-cog` to a release feature without a separate security
+and product-readiness decision.
+WebKitGTK `MiniBrowser` remains a useful second lightweight-browser provider.
+Its integration is deliberately deferred until Cog is built and working on the
+target, at which point it should be added behind the same packagegroup contract
+for a controlled Cog/MiniBrowser comparison.
 On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
 become part of the public display. Audio remains an explicit `audio` feature;
 select it for browser playback so Chromium is built with its audio backend and
@@ -72,8 +86,9 @@ The kiosk package installs Chromium managed policies under
 downloads, printing, Developer Tools, guest/incognito profiles, or install
 extensions. The policy file is a conffile for product-specific adjustments;
 physical keyboard and touch escape paths still require board testing.
-It cannot be combined with `flutter`, `godot`, or `android-container`, which
-are alternative owners of the same display.
+The two kiosk browser features are mutually exclusive. Neither can be combined
+with `flutter`, `godot`, or `android-container`, which are alternative owners
+of the same display.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
@@ -83,7 +98,8 @@ addition because the current Waydroid recipe declares it in
 configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
-The `display`, `flutter`, `godot`, and `kiosk-browser` selections require the BSP to declare
+The `display`, `flutter`, `godot`, `kiosk-browser`, and `kiosk-cog`
+selections require the BSP to declare
 `display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
 the machine while preventing capable hardware from implicitly installing a UI.
 
@@ -96,9 +112,10 @@ Runtime payloads are owned by provider-neutral packagegroups:
 - `packagegroup-dd-android-container`
 
 `packagegroup-dd-kiosk-browser` installs `DD_KIOSK_BROWSER_RUNTIME`, which
-defaults to `dd-kiosk-browser`. That runtime package supplies the Chromium
-launcher and depends on `chromium-ozone-wayland`; a different browser runtime
-can replace it without changing the image hook or packagegroup.
+defaults to `dd-kiosk-browser`. The `kiosk-cog` feature selects
+`dd-kiosk-cog` instead. Both providers expose the same service, launcher,
+URL configuration and offline page paths, so the image hook and Weston kiosk
+integration remain unchanged.
 
 The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is

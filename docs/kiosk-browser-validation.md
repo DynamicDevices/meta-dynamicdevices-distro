@@ -59,7 +59,7 @@ a kiosk test result.
 | Boot | New deployment selected; Weston and `dd-kiosk-browser` active without restart loop | Pending |
 | Render | Fullscreen page fills the panel in the intended orientation; no browser chrome or dialogs | Pending |
 | Touch | Tap, scroll and any required text input work; public input cannot leave the kiosk page | Pending |
-| Audio | Chromium has a Pulse sink input, `wm8524audio` PCM is `RUNNING`, and a DPX play/pause/play capture follows the injected transition without clipping | Pending |
+| Audio | The feature-selected TAS2555 card is present, Chromium has a Pulse sink input, its playback PCM is `RUNNING`, and a DPX play/pause/play capture follows the injected transition without clipping | Pending |
 | Network loss | Remote test URL may show a transient error, but the service stays recoverable | Pending |
 | Network return | NetworkManager dispatcher restarts Chromium and the configured URL loads | Pending |
 | Browser crash | Killing Chromium causes systemd restart without a restore prompt | Pending |
@@ -101,9 +101,12 @@ removed both ALSA and PulseAudio, leaving Chromium with no usable audio backend.
 The corrected Screen kiosk tuple therefore selects `kiosk-browser audio`.
 The kiosk audio drop-in joins the service to the `audio` group, orders it after
 the system PulseAudio service, and points Chromium at the image's Unix socket.
-The Screen machine selects ALSA card `wm8524audio` by stable name, never by the
-observed card index. Target 2995 predates this correction and cannot be the
-audio acceptance image; target 2998 is the replacement build gate.
+Michael confirmed on 2026-09-30 that Screen uses TAS2555, not the EVK WM8524.
+When the `tas2555` machine feature is enabled, the kiosk recipe selects
+`tas2555audio` by name, never by the observed card index. Without that
+feature, it does not install a Screen-specific ALSA default. A running
+WM8524 PCM is not evidence of working Screen audio. Previous image gates
+must not be used as TAS2555 audio acceptance evidence.
 
 ### OSTree hotpatch isolation
 

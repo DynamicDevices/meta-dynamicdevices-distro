@@ -1,0 +1,63 @@
+From 654f0c3862f7bae5bad07b4b451e10c9e9affa35 Mon Sep 17 00:00:00 2001
+From: Fujii Hironori <Hironori.Fujii@sony.com>
+Date: Tue, 18 Mar 2025 12:35:31 -0700
+Subject: [PATCH] WTF: Guard invalid enum constants with Clang 20
+
+Clang 20 rejects an explicitly specified non-type template argument when the
+integer is outside the valid range of the enum.  Probe the conversion through
+SFINAE before instantiating enumName, leaving invalid entries empty as earlier
+compilers effectively did.
+
+This is a narrow adaptation of WebKit commit 654f0c3862f7 for the older
+enumNames() implementation in WPE WebKit 2.46.7.
+
+WebKit bug: https://bugs.webkit.org/show_bug.cgi?id=289669
+Upstream commit: https://github.com/WebKit/WebKit/commit/654f0c3862f7
+
+Upstream-Status: Backport [654f0c3862f7]
+Signed-off-by: Alex J Lennon <ajlennon@dynamicdevices.co.uk>
+---
+ Source/WTF/wtf/EnumTraits.h | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WTF/wtf/EnumTraits.h b/Source/WTF/wtf/EnumTraits.h
+index 9de70889d704..39499eef594c 100644
+--- a/Source/WTF/wtf/EnumTraits.h
++++ b/Source/WTF/wtf/EnumTraits.h
+@@ -159,6 +159,16 @@ constexpr bool isZeroBasedContiguousEnum()
+ #pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
+ #endif
+ 
++#if COMPILER(CLANG) && __clang_major__ >= 16
++template<typename E, auto V, typename = void>
++inline constexpr bool isEnumConstexprStaticCastValid = false;
++template<typename E, auto V>
++inline constexpr bool isEnumConstexprStaticCastValid<E, V, std::void_t<std::integral_constant<E, static_cast<E>(V)>>> = true;
++#else
++template<typename, auto>
++inline constexpr bool isEnumConstexprStaticCastValid = true;
++#endif
++
+ template<typename E>
+ constexpr std::span<const char> enumTypeNameImpl()
+ {
+@@ -236,13 +246,16 @@ constexpr void forConstexpr(const auto& func)
+ 
+ }
+ 
+ template<typename E, size_t limit = 256>
+ constexpr std::array<std::span<const char>, limit> enumNames()
+ {
+     std::array<std::span<const char>, limit> names;
+ 
+     detail::forConstexpr<0, limit>([&] (auto i) {
+-        names[i] = enumName<static_cast<E>(static_cast<unsigned>(i))>();
++        if constexpr (isEnumConstexprStaticCastValid<E, static_cast<std::underlying_type_t<E>>(i)>)
++            names[i] = enumName<static_cast<E>(static_cast<std::underlying_type_t<E>>(i))>();
++        else
++            names[i] = { };
+     });
+     return names;
+ }
+-- 
+2.43.0

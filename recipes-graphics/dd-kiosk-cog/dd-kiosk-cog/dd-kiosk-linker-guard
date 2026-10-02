@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+# A development hotpatch once placed the rollback deployment's complete
+# /usr/lib in ld.so.conf. That made Weston combine current G2D/libGAL with
+# rollback libweston/EGL/GBM and fail its compositor backend. Quarantine only
+# the two known legacy hotpatches; fail closed for any other cross-deployment
+# linker policy rather than silently rewriting administrator configuration.
+legacy_ld=/etc/ld.so.conf.d/kiosk-audio-hotpatch.conf
+legacy_browser=/etc/systemd/system/dd-kiosk-browser.service.d/zz-audio-hotpatch.conf
+
+for legacy in "$legacy_ld" "$legacy_browser"; do
+    if [ -f "$legacy" ] && grep -Eq '^[^#]*/ostree/deploy/.+/usr/lib' "$legacy"; then
+        mv -f "$legacy" "$legacy.disabled-mixed-deployment"
+    fi
+done
+
+unsafe=
+for config in /etc/ld.so.conf /etc/ld.so.conf.d/*.conf; do
+    [ -f "$config" ] || continue
+    if grep -Eq '^[[:space:]]*/ostree/deploy/.+/usr/lib' "$config"; then
+        unsafe="${unsafe}${unsafe:+ }$config"
+    fi
+done
+if [ -n "$unsafe" ]; then
+    echo "Refusing cross-deployment dynamic-linker configuration: $unsafe" >&2
+    exit 1
+fi
+
+/sbin/ldconfig
+if /sbin/ldconfig -p | grep -q '/ostree/deploy/.*/usr/lib'; then
+    echo 'Refusing dynamic-linker cache containing an OSTree deployment path' >&2
+    exit 1
+fi
