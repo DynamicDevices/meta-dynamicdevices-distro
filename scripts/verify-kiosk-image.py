@@ -16,7 +16,7 @@ COMMON_REQUIRED = {'weston', 'networkmanager-daemon',
                    'packagegroup-dd-kiosk-browser'}
 PROVIDER_REQUIRED = {
     'chromium': {'chromium-ozone-wayland', 'dd-kiosk-browser'},
-    'cog': {'cog', 'wpewebkit', 'wpebackend-fdo', 'dd-kiosk-cog'},
+    'cog': {'cog', 'wpewebkit', 'dd-kiosk-cog'},
 }
 PROVIDER_RUNTIME = {
     'chromium': 'dd-kiosk-browser',
@@ -46,7 +46,7 @@ PROVIDER_ARTIFACT_FILES = {
         '/usr/bin/chromium',
         '/etc/chromium/policies/managed/dd-kiosk-browser.json',
     ),
-    'cog': ('/usr/bin/cog',),
+    'cog': ('/usr/bin/cog', '/usr/lib/libWPEBackend-fdo-1.0.so.1'),
 }
 
 
@@ -155,28 +155,61 @@ def verify_ota_ext4(path, provider):
     return {deployment.lstrip('/') for deployment in deployments}
 
 
-def verify_ota_tar(path, deployments, provider):
-    """Check the separate OTA tar ships the same named deployment payload."""
-    required = {f'{deployment}{name}' for deployment in deployments
-                for name in artifact_files(provider)}
-    units = {deployment: {f'{deployment}/usr/lib/systemd/system/dd-kiosk-browser.service',
-                          f'{deployment}/lib/systemd/system/dd-kiosk-browser.service'}
-             for deployment in deployments}
-    found = set()
-    with tarfile.open(path, mode='r|xz') as archive:
-        for member in archive:
-            if not (member.isfile() or member.issym()):
-                continue
-            name = member.name[2:] if member.name.startswith('./') else member.name
-            if name in required or any(name in variants for variants in units.values()):
-                found.add(name)
-    missing = sorted(required - found)
-    for deployment, variants in units.items():
-        if not variants & found:
-            missing.append(f'{deployment}/dd-kiosk-browser.service')
-    if missing:
-        raise ValueError(f'OTA tar missing kiosk payload: {missing}')
-    print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
+def verify_ota_tar(path, deployments, provider, ostree_tool):
+    """Resolve the OTA's OSTree refs and inspect the committed filesystem."""
+    if not ostree_tool or not pathlib.Path(ostree_tool).is_file():
+        raise ValueError('an OSTree executable is required to inspect the OTA tar')
+
+    def ostree(repo, *args):
+        result = subprocess.run(
+            [str(ostree_tool), f'--repo={repo}', *args],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or 'OSTree inspection failed')
+        return result.stdout
+
+    with tempfile.TemporaryDirectory(prefix='dd-kiosk-ota-tar-') as directory:
+        extracted = subprocess.run(
+            ['tar', '-xJf', str(path), '-C', directory, '--no-same-owner'],
+            capture_output=True, text=True, check=False,
+        )
+        if extracted.returncode:
+            raise ValueError(f'cannot extract OTA tar: {extracted.stderr.strip()}')
+        repo = pathlib.Path(directory) / 'ostree/repo'
+        if not repo.is_dir():
+            raise ValueError('OTA tar does not contain ostree/repo')
+        refs = [line for line in ostree(repo, 'refs').splitlines() if line]
+        if not refs:
+            raise ValueError('OTA tar OSTree repository has no refs')
+        commits = {ostree(repo, 'rev-parse', ref).strip() for ref in refs}
+        expected = {pathlib.PurePosixPath(deployment).name.rsplit('.', 1)[0]
+                    for deployment in deployments}
+        if not expected <= commits:
+            raise ValueError(
+                f'OTA tar commits {sorted(commits)} do not include ext4 deployments '
+                f'{sorted(expected)}'
+            )
+        required = [('/usr/etc' + name[4:]) if name.startswith('/etc/') else name
+                    for name in artifact_files(provider)]
+        unit_variants = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
+                         '/lib/systemd/system/dd-kiosk-browser.service')
+        for commit in expected:
+            missing = [name for name in required
+                       if subprocess.run(
+                           [str(ostree_tool), f'--repo={repo}', 'ls', commit, name],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           check=False,
+                       ).returncode]
+            if all(subprocess.run(
+                    [str(ostree_tool), f'--repo={repo}', 'ls', commit, name],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    check=False,
+                   ).returncode for name in unit_variants):
+                missing.append('dd-kiosk-browser.service')
+            if missing:
+                raise ValueError(f'OTA tar commit {commit} missing kiosk payload: {missing}')
+    print(f'OTA tar kiosk payload: verified in {len(expected)} commit(s) of {path}')
 
 
 def verify_wic_partitions(wic_gz, ota_gz):
@@ -289,7 +322,7 @@ def verify_rootfs(rootfs, provider):
         if contract not in audio:
             raise ValueError(f'rootfs kiosk audio drop-in lacks {contract}')
     asound = (rootfs / 'etc/asound.conf').read_text()
-    if 'card tas2555audio' not in asound:
+    if 'tas2555audio' not in asound or 'rate 48000' not in asound:
         raise ValueError('rootfs ALSA default is not the Jaguar Screen TAS2555 card')
 
     if provider == 'chromium':
@@ -334,6 +367,9 @@ def main():
     p.add_argument('--ota-tar-xz', type=pathlib.Path, required=True)
     p.add_argument('--rootfs', type=pathlib.Path, required=True,
                    help='BitBake image rootfs directory to inspect installed files')
+    p.add_argument('--ostree-tool', type=pathlib.Path,
+                   default=shutil.which('ostree'),
+                   help='OSTree executable used to inspect the OTA repository')
     args = p.parse_args()
     for name in ('baseline_wic_gz_bytes', 'baseline_ota_ext4_gz_bytes',
                  'baseline_ota_tar_xz_bytes'):
@@ -365,7 +401,7 @@ def main():
             p.error(str(exc))
     try:
         deployments = verify_ota_ext4(args.ota_ext4_gz, provider)
-        verify_ota_tar(args.ota_tar_xz, deployments, provider)
+        verify_ota_tar(args.ota_tar_xz, deployments, provider, args.ostree_tool)
         verify_wic_partitions(args.candidate_wic_gz, args.ota_ext4_gz)
     except (ValueError, OSError, tarfile.TarError) as exc:
         p.error(str(exc))

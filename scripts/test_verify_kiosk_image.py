@@ -60,7 +60,8 @@ class KioskVerifierTests(unittest.TestCase):
             '[Unit]\nAfter=pulseaudio.service\n'
             '[Service]\nEnvironment=PULSE_SERVER=unix:/tmp/pulseaudio.socket\n',
         )
-        self.write(root, 'etc/asound.conf', 'pcm.!default { card tas2555audio; }\n')
+        self.write(root, 'etc/asound.conf',
+                   'pcm.!default { slave { pcm "hw:tas2555audio,0"; rate 48000; } }\n')
         self.write(root, 'etc/default/dd-kiosk-browser',
                    'DD_KIOSK_URL=https://active-esl.com\n')
         self.write(root, 'etc/xdg/weston/weston-screen.ini',
@@ -72,6 +73,8 @@ class KioskVerifierTests(unittest.TestCase):
                    '#!/bin/sh\n', executable=True)
         self.write(root, f'usr/bin/{"chromium" if provider == "chromium" else "cog"}',
                    executable=True)
+        if provider == 'cog':
+            self.write(root, 'usr/lib/libWPEBackend-fdo-1.0.so.1')
 
         if provider == 'chromium':
             policy = {

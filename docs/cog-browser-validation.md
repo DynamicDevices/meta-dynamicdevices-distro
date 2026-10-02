@@ -33,23 +33,33 @@ build or board test.
 | Intermediate OTA tar.xz | 331,897,412 bytes; SHA-256 `62e4f31e52f04fdf57cdfbd48c3e0478ccdbb8e6f09c3472714f997a8d26f72f` |
 | `scripts/verify-kiosk-image.py` | Correctly failed: rootfs ALSA default was not `tas2555audio`; artifact is not a deployment candidate |
 | Exact-manifest TAS2555 component proof | Passed with a temporary feature override: 1,005 tasks, all successful; module package QA and Screen kernel/DT dependencies included |
+| DEV ROM1 Cog/audio image | `20261002135738`; 10,175 tasks attempted, all successful; OSTree `24ceffd0d1225ca9b6dcee34c7eadfc339427ac43a9e04fe1f6a363ade1c357e` |
+| DEV manifest | 118,035 bytes; SHA-256 `17017e1e46a570e4f4878d9f93dbb1d6278949ab7d9711ad358a6f44c1553485` |
+| DEV WIC gzip | 462,568,423 bytes; SHA-256 `54db1450a41dcc804f3ff40d46a5023c82544d2164363b16de798cbeb37efe1d`; +4.2% against deployed target 2945 |
+| DEV OTA ext4 gzip | 461,626,856 bytes; SHA-256 `5106df888e982b2b77b47b37dd32489ff04e22ea84eaab7cad7b7b8636a05a2d`; +4.3% |
+| DEV OTA tar.xz | 331,716,340 bytes; SHA-256 `784519267fd9205911431874ece77e273181c0a05e1f7267150a0b416b28a60f`; +14.2% |
+| Final provider-aware verification | Passed: rootfs, OTA ext4 deployment, OTA OSTree commit, WIC boot FAT and byte-identical WIC/OTA root; required missing none, forbidden payload none |
 
 The image verifier derives the browser provider from the package manifest. For
-Cog it requires `cog`, `wpewebkit`, `wpebackend-fdo`, `dd-kiosk-cog`, Weston,
-NetworkManager and the provider-neutral kiosk packagegroup. It also verifies
+Cog it requires `cog`, `wpewebkit`, `dd-kiosk-cog`, Weston, NetworkManager and
+the provider-neutral kiosk packagegroup, plus the shipped
+`libWPEBackend-fdo-1.0.so.1` runtime artifact. It also verifies
 the Wayland/restart flags, TAS2555 ALSA default, PulseAudio drop-in, linker
 guard, service ownership, Weston kiosk shell and the payload inside both OTA
-formats and the WIC root partition. Chromium policy is deliberately not a Cog
-requirement.
+formats and the WIC root partition. The OTA tar is an OSTree object repository,
+so the verifier resolves its refs and checks the committed tree, mapping
+deployment `/etc` content to OSTree's `/usr/etc`. Chromium policy is
+deliberately not a Cog requirement.
 
-The successful image build proves the Cog/WPE WebKit integration and image
-construction path. It does not close audio acceptance. The resolved machine
-did not enable `tas2555`, the manifest contained no TAS2555 module package and
-`/etc/asound.conf` remained the generic `hw:0,0` configuration. The staged TI
-driver requires `tas2555_uCDSP.bin`, but no speaker-specific firmware or
-speaker load/tuning data was found in the repositories or MemPalace. TI ROM
-mode lacks speaker protection, so the feature remains disabled rather than
-turning an unprotected fallback into the default product path.
+The final DEV image proves the Cog/WPE WebKit integration and image construction
+path with `tas2555 tas2555-rom1-dev`. The machine depends on the stable
+`kernel-module-tas2555` recipe package, and the kernel-versioned split package
+contains the module. Jaguar Screen's `/etc/asound.conf` is owned by
+`alsa-state`, not either browser provider, and selects `tas2555audio` through a
+48 kHz ALSA plug path. This avoids a package ownership clash and keeps physical
+audio policy at the BSP boundary. It does not close audio acceptance: ROM1 is
+unprotected, and no speaker-specific PPC3/uCDSP characterization or tuning has
+been performed for the arbitrary 4 ohm development speaker.
 
 The BSP now fail-closes this earlier than the external verifier: enabling the
 `tas2555` machine feature adds a rootfs postprocess gate requiring non-empty

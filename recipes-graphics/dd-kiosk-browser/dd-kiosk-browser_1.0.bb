@@ -21,12 +21,6 @@ inherit systemd
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 
-# Boards with a preferred physical output name it here. Keeping this as a
-# machine override avoids encoding card indices or Screen-specific policy in
-# the generic kiosk launcher.
-DD_KIOSK_AUDIO_CARD ?= ""
-DD_KIOSK_AUDIO_CARD:imx8mm-jaguar-screen = "${@bb.utils.contains('MACHINE_FEATURES', 'tas2555', 'tas2555audio', '', d)}"
-
 SYSTEMD_SERVICE:${PN} = "dd-kiosk-browser.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
@@ -47,13 +41,7 @@ do_install() {
         install -d ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d
         install -m 0644 ${WORKDIR}/dd-kiosk-browser-audio.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf
     fi
-    if [ -n "${DD_KIOSK_AUDIO_CARD}" ]; then
-        printf '%s\n' \
-            'pcm.!default { type hw; card ${DD_KIOSK_AUDIO_CARD}; device 0; }' \
-            'ctl.!default { type hw; card ${DD_KIOSK_AUDIO_CARD}; }' \
-            > ${D}${sysconfdir}/asound.conf
-    fi
 }
 
 CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
-FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${libexecdir}/dd-kiosk-linker-guard ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf ${sysconfdir}/asound.conf"
+FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${libexecdir}/dd-kiosk-linker-guard ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf"
