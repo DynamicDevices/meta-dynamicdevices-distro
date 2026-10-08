@@ -39,6 +39,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/imag
 # Enable Godot related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
 
+# Optional ARM64 x86 userspace emulation, selected by DD_PRODUCT_FEATURES.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'fex', 'recipes-samples/images/lmp-feature-fex.inc', '', d)}
+
 # Enable OP-TEE related recipes if provided by the image
 require ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'recipes-samples/images/lmp-feature-optee.inc', '', d)}
 

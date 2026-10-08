@@ -16,6 +16,7 @@ DD_PRODUCT_FEATURES_VALID = " \
     auto-register \
     cra-audit \
     display \
+    fex \
     flutter \
     godot \
     improv \
@@ -41,6 +42,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'alsa', 'alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'audio', 'alsa pulseaudio', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'display', 'display-runtime wayland opengl pipewire', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'fex', 'fex', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
@@ -63,6 +65,13 @@ python dd_validate_product_features() {
             "Unknown DD_PRODUCT_FEATURES value(s): %s. Valid values: %s"
             % (" ".join(unknown), " ".join(sorted(valid)))
         )
+
+    if "fex" in selected:
+        if e.data.getVar("TARGET_ARCH") != "aarch64" or e.data.getVar("TCLIBC") != "glibc":
+            bb.fatal("DD_PRODUCT_FEATURES 'fex' requires ARM64/glibc Linux")
+        collections = set((e.data.getVar("BBFILE_COLLECTIONS") or "").split())
+        if "clang-layer" not in collections:
+            bb.fatal("DD_PRODUCT_FEATURES 'fex' requires meta-clang in BBLAYERS")
 
     display_software = selected & {"display", "flutter", "godot"}
     machine_features = set((e.data.getVar("MACHINE_FEATURES") or "").split())

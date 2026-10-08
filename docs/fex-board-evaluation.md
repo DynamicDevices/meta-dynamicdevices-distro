@@ -46,15 +46,25 @@ First build just the components:
 bitbake fex-emu fex-smoke-test
 ```
 
-For a disposable development image only, opt in explicitly:
+Enable the product feature in the existing product/factory configuration:
 
 ```bitbake
-IMAGE_INSTALL:append:imx95-frdm-evk = " fex-emu fex-smoke-test"
+DD_PRODUCT_FEATURES:append = " fex"
 ```
 
 Then build the development image through its existing remote CI flow. Adding
 recipes does not flash/update a board, change enrollment, or enroll an
 interpreter. Explicit `FEX program` invocation needs no global binfmt handler.
+
+The feature expands to `DISTRO_FEATURES` `fex`, conditionally includes the image
+fragment and selects `packagegroup-dd-fex` with the emulator and diagnostic
+fixture. ARM64/glibc and meta-clang are validated when selecting the feature.
+It stays off by default and does not require a separate Foundries branch.
+
+Remote exact-pin BitBake metadata checks passed with the feature enabled and
+disabled. They verified image package selection, packagegroup dependencies,
+the recipe-local clang selection, and rejection of unsupported architecture
+or missing meta-clang. This focused preflight is not a full image-build proof.
 
 ## Verified board and runtime
 

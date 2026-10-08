@@ -46,6 +46,9 @@ DD_PRODUCT_FEATURES = "improv flutter"
 
 # Android screen; currently implemented by Waydroid
 DD_PRODUCT_FEATURES = "improv android-container"
+
+# FRDM development: retain the existing UI and opt into x86 emulation
+DD_PRODUCT_FEATURES = "display android-container fex"
 ```
 
 Feature bundles expand prerequisites centrally. In particular,
@@ -61,6 +64,12 @@ addition because the current Waydroid recipe declares it in
 configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
+`fex` selects headless x86 userspace emulation and its static diagnostic fixture
+through `packagegroup-dd-fex`. It requires ARM64/glibc Linux and meta-clang;
+incompatible selections fail early. It does not imply a GUI, graphics thunks,
+Wine, guest-rootfs downloads or automatic binfmt enrollment. Unselected
+products retain their existing runtime. See [FEX evaluation](fex-board-evaluation.md).
+
 The `display`, `flutter`, and `godot` selections require the BSP to declare
 `display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
 the machine while preventing capable hardware from implicitly installing a UI.
@@ -71,6 +80,7 @@ Runtime payloads are owned by provider-neutral packagegroups:
 - `packagegroup-dd-audio`
 - `packagegroup-dd-flutter`
 - `packagegroup-dd-android-container`
+- `packagegroup-dd-fex`
 
 The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is
