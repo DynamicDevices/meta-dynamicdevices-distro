@@ -1,0 +1,33 @@
+From: Dynamic Devices <info@dynamicdevices.co.uk>
+Subject: [PATCH] cmake: leave symbol stripping to the packaging system
+
+Yocto splits debugging symbols and strips runtime binaries during packaging.
+Stripping at link time prevents that split and fails already-stripped QA.
+Keep the Release garbage collection and as-needed linker options, but leave
+the symbol table intact for the packaging task.
+
+Upstream-Status: Inappropriate [Yocto packaging owns debug splitting and stripping]
+
+---
+ Data/CMake/LinkerGC.cmake | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/Data/CMake/LinkerGC.cmake b/Data/CMake/LinkerGC.cmake
+--- a/Data/CMake/LinkerGC.cmake
++++ b/Data/CMake/LinkerGC.cmake
+@@ -2,7 +2,6 @@
+ 
+ # This applies some common linker options that reduce code size and linking time in Release mode. Namely:
+ # --gc-sections: Linktime garbage collection, discards unused sections from the final output
+-# --strip-all  : Similar to running `strip`, discards the symbol table from the final output
+ # --as-needed  : Only includes libraries that are actually needed in the final output.
+ 
+ macro(LinkerGC target)
+@@ -9,7 +8,6 @@ macro(LinkerGC target)
+   if (CMAKE_BUILD_TYPE MATCHES "RELEASE")
+     target_link_options(${target} PRIVATE
+       "LINKER:--gc-sections"
+-      "LINKER:--strip-all"
+       "LINKER:--as-needed")
+   endif()
+ endmacro()

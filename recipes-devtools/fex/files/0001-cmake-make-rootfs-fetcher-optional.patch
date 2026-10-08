@@ -1,0 +1,28 @@
+From: Dynamic Devices <info@dynamicdevices.co.uk>
+Subject: [PATCH] cmake: make the guest rootfs downloader optional
+
+Embedded evaluation images provision guest userspace separately. Do not ship
+a downloader or pull in dependencies for a tool these images do not use.
+
+Upstream-Status: Inappropriate [embedded evaluation configuration]
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -8,5 +8,6 @@
+ option(BUILD_THUNKS "Build thunks" FALSE)
+ option(BUILD_FEXCONFIG "Build FEXConfig" TRUE)
++option(BUILD_ROOTFS_FETCHER "Build FEXRootFSFetcher" TRUE)
+ option(ENABLE_CLANG_THUNKS "Build thunks with clang" TRUE)
+ option(ENABLE_IWYU "Enable the Include What You Use sanitizer" FALSE)
+ option(ENABLE_LTO "Enable LTO with compilation" TRUE)
+--- a/Source/Tools/CMakeLists.txt
++++ b/Source/Tools/CMakeLists.txt
+@@ -16,7 +16,7 @@ if (NOT MINGW)
+     add_subdirectory(FEXGDBReader/)
+   endif()
+ 
+-  if (NOT BUILD_STEAM_SUPPORT)
++  if (BUILD_ROOTFS_FETCHER AND NOT BUILD_STEAM_SUPPORT)
+     add_subdirectory(FEXRootFSFetcher/)
+   endif()
+ 

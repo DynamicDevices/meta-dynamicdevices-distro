@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -eu
+
+case "$(uname -m)" in
+    aarch64|arm64) ;;
+    *) echo "This wrapper is for an ARM64 Linux board." >&2; exit 1 ;;
+esac
+
+command -v FEX >/dev/null 2>&1 || {
+    echo "FEX is not installed; add fex-emu to the evaluation image." >&2
+    exit 1
+}
+
+# A static ELF needs no guest loader/libc. Supply an existing empty directory
+# because FEX still requires a rootfs path on ARM64. Keep the disk cache off.
+test_data_dir=${FEX_SMOKE_DATADIR:-@DATADIR@/fex-emu/tests}
+if [ ! -d "$test_data_dir/empty-rootfs" ] || [ ! -x "$test_data_dir/x86_64-smoke" ]; then
+    echo "FEX smoke data is missing from $test_data_dir." >&2
+    exit 1
+fi
+FEX_ROOTFS=$test_data_dir/empty-rootfs
+FEX_DISKCACHE=0
+export FEX_ROOTFS FEX_DISKCACHE
+exec FEX "$test_data_dir/x86_64-smoke"
