@@ -10,13 +10,9 @@ SRC_URI += " \
 DD_CHROMIUM_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
 do_compile[file-checksums] += "${DD_CHROMIUM_GBM_PATCH}:True"
 
-# Foundries' high-memory worker is required for Chromium.  Keep Ninja's
-# concurrency deterministic so a mis-sized worker cannot silently turn this
-# task into a nine-hour timeout, and record the effective resources in the
-# normal task log for every build.
+# Retain deterministic Ninja concurrency and log worker resources.
+# Foundries worker sizing is no longer a compile admission gate.
 DD_CHROMIUM_BUILD_JOBS ?= "32"
-DD_CHROMIUM_MIN_CPUS ?= "32"
-DD_CHROMIUM_MIN_MEMORY_BYTES ?= "48000000000"
 PARALLEL_MAKE = "-j ${DD_CHROMIUM_BUILD_JOBS}"
 
 do_compile:prepend() {
@@ -28,17 +24,10 @@ do_compile:prepend() {
         dd_chromium_memory_limit="$dd_chromium_physical_memory_bytes"
     fi
 
-    bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus min_cpus=${DD_CHROMIUM_MIN_CPUS} memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit min_memory_bytes=${DD_CHROMIUM_MIN_MEMORY_BYTES}"
+    bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit"
     bbnote "DD Chromium CPU affinity: $(awk '/^Cpus_allowed_list:/ { print $2 }' /proc/self/status)"
     bbnote "DD Chromium load: $(cat /proc/loadavg)"
     bbnote "DD Chromium cgroup CPU limit: $(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unavailable)"
-
-    if [ "$dd_chromium_cpus" -lt "${DD_CHROMIUM_MIN_CPUS}" ]; then
-        bbfatal "Chromium requires at least ${DD_CHROMIUM_MIN_CPUS} online CPUs; worker exposes $dd_chromium_cpus"
-    fi
-    if [ "$dd_chromium_memory_limit" -lt "${DD_CHROMIUM_MIN_MEMORY_BYTES}" ]; then
-        bbfatal "Chromium requires at least ${DD_CHROMIUM_MIN_MEMORY_BYTES} bytes of cgroup memory; worker exposes $dd_chromium_memory_limit bytes"
-    fi
 
     if ! grep -Fq '#include <gbm.h>' "${S}/ui/gl/gl_surface_egl.cc"; then
         patch -d "${S}" -p1 --fuzz=0 < "${DD_CHROMIUM_GBM_PATCH}"
