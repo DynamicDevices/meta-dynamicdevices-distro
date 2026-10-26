@@ -10,10 +10,8 @@ SRC_URI += " \
 DD_CHROMIUM_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
 do_compile[file-checksums] += "${DD_CHROMIUM_GBM_PATCH}:True"
 
-# Retain deterministic Ninja concurrency and log worker resources.
-# Foundries worker sizing is no longer a compile admission gate.
-DD_CHROMIUM_BUILD_JOBS ?= "32"
-PARALLEL_MAKE = "-j ${DD_CHROMIUM_BUILD_JOBS}"
+# Inherit parallelism from the build configuration instead of imposing a
+# Chromium-specific job count, and log the selected setting and worker resources.
 
 do_compile:prepend() {
     dd_chromium_cpus="$(getconf _NPROCESSORS_ONLN)"
@@ -24,7 +22,7 @@ do_compile:prepend() {
         dd_chromium_memory_limit="$dd_chromium_physical_memory_bytes"
     fi
 
-    bbnote "DD Chromium build resources: jobs=${DD_CHROMIUM_BUILD_JOBS} online_cpus=$dd_chromium_cpus memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit"
+    bbnote "DD Chromium build resources: parallel_make='${PARALLEL_MAKE}' online_cpus=$dd_chromium_cpus memory_kib=$dd_chromium_memory_kib cgroup_memory_bytes=$dd_chromium_memory_limit"
     bbnote "DD Chromium CPU affinity: $(awk '/^Cpus_allowed_list:/ { print $2 }' /proc/self/status)"
     bbnote "DD Chromium load: $(cat /proc/loadavg)"
     bbnote "DD Chromium cgroup CPU limit: $(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unavailable)"
