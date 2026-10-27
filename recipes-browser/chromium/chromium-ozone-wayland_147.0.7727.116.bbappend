@@ -10,8 +10,19 @@ SRC_URI += " \
 DD_CHROMIUM_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
 do_compile[file-checksums] += "${DD_CHROMIUM_GBM_PATCH}:True"
 
-# Inherit parallelism from the build configuration instead of imposing a
-# Chromium-specific job count, and log the selected setting and worker resources.
+# Bound compiler concurrency on the Foundries worker (44 CPUs, ~65 GiB limit).
+PARALLEL_MAKE = "-j 16"
+
+# Send diagnostics through BitBake's live FIFO instead of waiting for its
+# failure-log dump. Keep ordinary Ninja progress in the complete task log.
+DD_CHROMIUM_LIVE_BUILD := "${THISDIR}/${PN}/chromium-live-build.py"
+do_compile[file-checksums] += "${DD_CHROMIUM_LIVE_BUILD}:True"
+
+do_compile() {
+    python3 "${DD_CHROMIUM_LIVE_BUILD}" \
+        --fifo "${LOGFIFO}" --task-log "${T}/log.do_compile" -- \
+        ninja ${PARALLEL_MAKE} chrome chrome_sandbox chromedriver.unstripped
+}
 
 do_compile:prepend() {
     dd_chromium_cpus="$(getconf _NPROCESSORS_ONLN)"
