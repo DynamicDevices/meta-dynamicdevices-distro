@@ -1,14 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Dynamic Devices <engineering@dynamicdevices.co.uk>
 Date: Thu, 17 Sep 2026 18:30:00 +0100
-Subject: [PATCH] gl: match GBM EGL native window type for Wayland
+Subject: [PATCH] LEGACY ONLY: implementation-only GBM native window override
 
-The Wayland GPU sources include gbm.h before EGL, selecting a void pointer
-for EGLNativeWindowType. The core GL translation unit otherwise selects
-intptr_t through USE_OZONE, producing a different C++ constructor symbol
-for NativeViewGLSurfaceEGL and an undefined reference at the final link.
+Do not apply this patch. Retained only so do_compile can reverse it on source
+trees left by earlier builds, without invalidating do_unpack and all objects.
 
-Include GBM before the EGL surface header so both translation units agree.
+On Chromium 147, Wayland callers select intptr_t through USE_OZONE. Including
+gbm.h only in the core GL implementation instead selects void*, producing a
+different NativeViewGLSurfaceEGL constructor symbol. Target 3008 failed to link
+the caller's expected long constructor. Fresh trees must retain the upstream
+include order; reused trees must remove this override and rebuild that object.
 
 Upstream-Status: Inappropriate [i.MX Wayland GBM product configuration]
 

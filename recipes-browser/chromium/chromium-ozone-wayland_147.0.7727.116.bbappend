@@ -5,10 +5,13 @@ SRC_URI += " \
     file://0002-bytemuck-Drop-removed-LaneCount-bound.patch \
 "
 
-# Keep this late link fix in do_compile so the already built Chromium tree can
-# be resumed without re-running do_unpack and discarding its object files.
-DD_CHROMIUM_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
-do_compile[file-checksums] += "${DD_CHROMIUM_GBM_PATCH}:True"
+# The old implementation-only GBM include changed EGLNativeWindowType to
+# void*, while Wayland callers use Ozone's intptr_t. Never apply it to fresh
+# sources. Reverse it on reused trees so Ninja rebuilds the implementation
+# with the same constructor signature as its callers, without discarding all
+# existing Chromium objects through do_unpack.
+DD_CHROMIUM_LEGACY_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
+do_compile[file-checksums] += "${DD_CHROMIUM_LEGACY_GBM_PATCH}:True"
 
 # Bound compiler concurrency on the Foundries worker (44 CPUs, ~65 GiB limit).
 PARALLEL_MAKE = "-j 16"
@@ -38,7 +41,8 @@ do_compile:prepend() {
     bbnote "DD Chromium load: $(cat /proc/loadavg)"
     bbnote "DD Chromium cgroup CPU limit: $(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unavailable)"
 
-    if ! grep -Fq '#include <gbm.h>' "${S}/ui/gl/gl_surface_egl.cc"; then
-        patch -d "${S}" -p1 --fuzz=0 < "${DD_CHROMIUM_GBM_PATCH}"
+    if grep -Fq '#include <gbm.h>' "${S}/ui/gl/gl_surface_egl.cc"; then
+        bbnote "DD Chromium: reversing legacy implementation-only GBM include"
+        patch -d "${S}" -p1 --reverse --fuzz=0 < "${DD_CHROMIUM_LEGACY_GBM_PATCH}"
     fi
 }
