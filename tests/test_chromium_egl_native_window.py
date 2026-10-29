@@ -2,10 +2,13 @@
 
 The relevant EGL branches come from Chromium 147.0.7727.116's
 third_party/khronos/EGL/eglplatform.h: __GBM__ selects void*, while USE_OZONE
-selects intptr_t. Exercise the actual legacy patch against that distinction.
+selects intptr_t. Exercise both include-order failures, the actual legacy patch,
+and the G2D target-toolchain correction against that distinction.
 """
 
 from pathlib import Path
+import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -28,7 +31,10 @@ class NativeWindowABITests(unittest.TestCase):
         self.tree = Path(self.temp.name)
         self.source = self.tree / "ui/gl/gl_surface_egl.cc"
         self.source.parent.mkdir(parents=True)
-        (self.tree / "gbm.h").write_text("#define __GBM__ 1\n")
+        (self.tree / "gbm.h").write_text(
+            "#ifndef __GBM__\n#define __GBM__ 1\n"
+            "struct gbm_device {};\n#endif\n"
+        )
         (self.tree / "ui/gl/gl_surface_egl.h").write_text(
             "#pragma once\n#include <cstdint>\n#include <memory>\n"
             "#if defined(__GBM__)\n"
@@ -67,9 +73,10 @@ class NativeWindowABITests(unittest.TestCase):
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def link(self):
+    def link(self, flags=()):
         return subprocess.run(
             ["c++", "-std=c++17", "-DUSE_OZONE", "-I", str(self.tree),
+             *flags,
              str(self.source), str(self.tree / "caller.cc"),
              "-o", str(self.tree / "fixture")],
             capture_output=True, text=True, timeout=20,
@@ -90,6 +97,42 @@ class NativeWindowABITests(unittest.TestCase):
         self.assertEqual(self.source.read_text(), self.original)
         fixed = self.link()
         self.assertEqual(fixed.returncode, 0, fixed.stderr)
+
+    def test_vivante_caller_mismatch_and_target_header_fix(self):
+        caller = self.tree / "caller.cc"
+        caller.write_text(
+            '#include <gbm.h>\n'
+            + caller.read_text()
+            + "gbm_device* provider_declaration_must_remain_available = nullptr;\n"
+        )
+        # This is 3011's direction: caller wants void*, implementation intptr_t.
+        broken = self.link()
+        self.assertNotEqual(broken.returncode, 0)
+        self.assertIn("undefined reference", broken.stderr)
+        self.assertIn("NativeViewGLSurfaceEGL", broken.stderr)
+        self.assertIn("void*", broken.stderr)
+
+        recipe = RECIPE.read_text()
+        flag_text = re.search(
+            r'^CXXFLAGS:append:dd-graphics-imxg2d = "([^"]+)"$',
+            recipe, re.M,
+        )[1]
+        flags = shlex.split(flag_text)
+        self.assertEqual(flags, ["-include", "gbm.h"])
+        fixed = self.link(flags)
+        self.assertEqual(fixed.returncode, 0, fixed.stderr)
+        # No implementation-only source edit or source reset is needed.
+        self.assertEqual(self.source.read_text(), self.original)
+
+    def test_g2d_flag_leaves_other_backends_and_host_toolchain_alone(self):
+        recipe = RECIPE.read_text()
+        gbm_flags = [line for line in recipe.splitlines()
+                     if re.match(r'^(?:BUILD_)?(?:CPP|CXX|C)FLAGS.*=', line)
+                     and "gbm.h" in line]
+        self.assertEqual(gbm_flags, [
+            'CXXFLAGS:append:dd-graphics-imxg2d = " -include gbm.h"',
+        ])
+        self.assertEqual(self.link().returncode, 0)
 
     def test_recipe_only_reverses_patch_and_preserves_j16_and_streaming(self):
         recipe = RECIPE.read_text()

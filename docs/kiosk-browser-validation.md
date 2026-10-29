@@ -30,6 +30,15 @@ orientation and touch evidence, plus audio playback where applicable.
 
 ## Artifact checks
 
+Target 3011 reached Chromium's final link but failed: Wayland requested the
+`NativeViewGLSurfaceEGL` constructor with a `void*` native window, while the core
+GL implementation used the Ozone integer ABI. For the G2D backend only, the
+Chromium target C++ toolchain now pre-includes the complete provider `gbm.h` so
+both sides select the same ABI. Do not replace this with an implementation-only
+include or a direct `__GBM__` definition that could suppress header contents.
+The local fixture reproduces both mismatch directions and verifies the corrected
+link, but only a successful Foundries build proves the full Chromium link.
+
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
 It checks compressed-file integrity and SHA-256, package membership and size

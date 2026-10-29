@@ -5,11 +5,21 @@ SRC_URI += " \
     file://0002-bytemuck-Drop-removed-LaneCount-bound.patch \
 "
 
+# Vivante's gbm.h selects the pointer EGL native-window ABI. Wayland includes
+# it transitively before gl_surface_egl.h, while the core GL implementation
+# otherwise selects Ozone's intptr_t ABI. Target 3011 failed to link the
+# caller's pointer constructor. Include the complete provider header first in
+# every target C++ translation unit, not just one implementation. Do not define
+# __GBM__ directly: it may also be the provider header's include guard.
+# gn-utils.inc forwards CXXFLAGS to the target toolchain's extra_cxxflags;
+# BUILD_CXXFLAGS and other kiosk backends retain their existing configuration.
+CXXFLAGS:append:dd-graphics-imxg2d = " -include gbm.h"
+
 # The old implementation-only GBM include changed EGLNativeWindowType to
-# void*, while Wayland callers use Ozone's intptr_t. Never apply it to fresh
-# sources. Reverse it on reused trees so Ninja rebuilds the implementation
-# with the same constructor signature as its callers, without discarding all
-# existing Chromium objects through do_unpack.
+# void* without changing the callers' ABI. Never apply it to fresh sources.
+# Reverse it on reused trees. The provider-scoped target C++ flag above now
+# selects the G2D ABI consistently; the upstream include order remains valid
+# for Etnaviv. Neither path needs a do_unpack reset.
 DD_CHROMIUM_LEGACY_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
 do_compile[file-checksums] += "${DD_CHROMIUM_LEGACY_GBM_PATCH}:True"
 
