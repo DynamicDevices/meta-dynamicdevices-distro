@@ -5,6 +5,31 @@ This record applies to `imx8mm-jaguar-screen` with
 factory target, image checksums, and observed results together. A local parse
 or recipe build does not count as hardware acceptance.
 
+## Screen G2D graphics contract
+
+The Screen kiosk selects `DD_KIOSK_GRAPHICS_BACKEND = "imxg2d"`; other kiosk
+machines retain the existing Etnaviv default. The Screen must use the BSP's
+matching Vivante EGL/GBM/GLES providers and NXP Weston's `imxg2d` renderer.
+Do not remove `--use-g2d` merely to make a GL-only compositor start, or mix
+Mesa userspace providers and old deployment libraries into the NXP stack.
+
+Target 3010 installed successfully but failed hardware acceptance: its kiosk
+profile disabled `imxg2d` and selected Mesa while the board retained a Screen
+service override requesting `--use-g2d`. The latest Weston invocation ended
+with `fatal: unhandled option: --use-g2d`. This is not a Chromium compile error.
+
+The replacement must build `g2d-renderer.so`; the Weston installation task
+fails if it is missing. Before accepting the image, record the exact source,
+manifest, target and active OSTree hash; confirm G2D initialises in the current
+Weston invocation, then test Chromium rendering and its actual GPU backend.
+The prior source recorded Chromium compatibility trouble with Vivante, so
+restoring provider selection is a candidate fix, not proof that Chromium works.
+Inspect any retained `/etc` overrides against the new image. Preserve sandbox,
+policy and development-only screenshot restrictions. Require visible panel,
+orientation and touch evidence, plus audio playback where applicable.
+
+## Artifact checks
+
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
 It checks compressed-file integrity and SHA-256, package membership and size

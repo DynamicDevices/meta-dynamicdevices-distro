@@ -12,9 +12,12 @@ DD_PRODUCT_FEATURES ?= ""
 # The kiosk manifest carries its own pinned Chromium and Rust-mixin layers.
 # Limit their provider choices to kiosk builds so this shared distro contract
 # does not alter any existing product's toolchain or recipe selection.  The
-# kiosk also uses the upstream DRM/Mesa Etnaviv stack: Chromium's GBM/Wayland
-# path is not compatible with the proprietary Vivante EGL shim on this image.
-OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-etnaviv' if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+# graphics backend is selected independently of the browser. The Screen uses
+# NXP's G2D compositor and matching BSP EGL/GBM/GLES providers; other kiosk
+# machines retain the existing Mesa/Etnaviv default.
+DD_KIOSK_GRAPHICS_BACKEND ?= "etnaviv"
+DD_KIOSK_GRAPHICS_BACKEND:imx8mm-jaguar-screen = "imxg2d"
+OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-' + d.getVar('DD_KIOSK_GRAPHICS_BACKEND') if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
 RUSTVERSION:ddkioskbrowser = "1.98.1"
 PREFERRED_VERSION_nativesdk-cargo:ddkioskbrowser = "${RUSTVERSION}"
 PREFERRED_VERSION_nativesdk-libstd-rs:ddkioskbrowser = "${RUSTVERSION}"
@@ -89,6 +92,10 @@ dd_validate_product_features[eventmask] = "bb.event.ConfigParsed"
 
 python dd_validate_product_features() {
     selected = set((e.data.getVar("DD_PRODUCT_FEATURES") or "").split())
+    if "kiosk-browser" in selected:
+        backend = e.data.getVar("DD_KIOSK_GRAPHICS_BACKEND")
+        if backend not in {"etnaviv", "imxg2d"}:
+            bb.fatal("Unknown DD_KIOSK_GRAPHICS_BACKEND: %s" % backend)
     valid = set((e.data.getVar("DD_PRODUCT_FEATURES_VALID") or "").split())
     unknown = sorted(selected - valid)
     if unknown:
@@ -113,6 +120,10 @@ python dd_validate_product_features() {
             % " ".join(sorted(display_software))
         )
 }
+
+# Never enable the Etnaviv kernel/userspace path alongside NXP G2D. With the
+# Etnaviv overrides inactive, the machine's original Vivante providers apply.
+DISTRO_FEATURES:remove:dd-graphics-imxg2d = "etnaviv"
 
 # Mesa must own the complete userspace graphics API set for Etnaviv.  These
 # preferences override the i.MX machine's proprietary imxgpu provider defaults
