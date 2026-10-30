@@ -36,6 +36,10 @@ do_install() {
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser
     install -m 0644 ${WORKDIR}/kiosk-policy.json ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
+    # Production stays locked down; only the explicit development build enables tools.
+    if [ "${DEV_MODE}" = "1" ]; then
+        sed -i 's/"DeveloperToolsAvailability": 2/"DeveloperToolsAvailability": 1/' ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
+    fi
     install -m 0755 ${WORKDIR}/dd-kiosk-linker-guard ${D}${libexecdir}/dd-kiosk-linker-guard
     install -m 0644 ${WORKDIR}/weston-linker-guard.conf ${D}${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf
     install -m 0644 ${WORKDIR}/dd-kiosk-native-runtime.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf
