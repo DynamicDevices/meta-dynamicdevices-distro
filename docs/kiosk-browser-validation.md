@@ -110,7 +110,7 @@ a kiosk test result.
 | Boot | New deployment selected; Weston and `dd-kiosk-browser` active without restart loop | Pending |
 | Render | Fullscreen page fills the panel in the intended orientation; no browser chrome or dialogs | Pending |
 | Touch | Tap, scroll and any required text input work; public input cannot leave the kiosk page | Pending |
-| Audio | Chromium has a Pulse sink input, `wm8524audio` PCM is `RUNNING`, and a DPX play/pause/play capture follows the injected transition without clipping | Pending |
+| Audio | Chromium plays through the BSP-selected `tas2555audio` card in the selected ROM1 or SmartAmp mode; physical speaker sound follows play/pause/play without clipping | Pending |
 | Network loss | Remote test URL may show a transient error, but the service stays recoverable | Pending |
 | Network return | NetworkManager dispatcher restarts Chromium and the configured URL loads | Pending |
 | Browser crash | Killing Chromium causes systemd restart without a restore prompt | Pending |
@@ -152,9 +152,14 @@ removed both ALSA and PulseAudio, leaving Chromium with no usable audio backend.
 The corrected Screen kiosk tuple therefore selects `kiosk-browser audio`.
 The kiosk audio drop-in joins the service to the `audio` group, orders it after
 the system PulseAudio service, and points Chromium at the image's Unix socket.
-The Screen machine selects ALSA card `wm8524audio` by stable name, never by the
-observed card index. Target 2995 predates this correction and cannot be the
-audio acceptance image; target 2998 is the replacement build gate.
+The BSP's `tas2555` machine feature selects the amplifier driver, SAI2 device
+tree and `tas2555audio` ALSA defaults. Development Screen images select
+firmware-free `tas2555-rom1-dev` at 48 kHz, boost off and 0 dB DAC gain;
+SmartAmp production mode instead requires speaker-specific firmware.
+The distro does not override the hardware card. A Pulse stream or successful
+playback command alone is not speaker acceptance: verify the selected mode,
+the deployed source revisions and audible output from the physical speaker.
+Earlier WM8524-based images are not valid audio acceptance images.
 
 ### OSTree hotpatch isolation
 
