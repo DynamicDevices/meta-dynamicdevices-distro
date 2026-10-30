@@ -41,11 +41,11 @@ class G2DSelectionTests(unittest.TestCase):
             DD_KIOSK_GRAPHICS_BACKEND=self.backend(machine),
         )})
 
-    def test_screen_selects_nxp_and_not_mesa(self):
-        self.assertEqual(self.backend("imx8mm-jaguar-screen"), "imxg2d")
+    def test_screen_selects_mesa_and_not_nxp(self):
+        self.assertEqual(self.backend("imx8mm-jaguar-screen"), "etnaviv")
         active = self.overrides("kiosk-browser audio", "imx8mm-jaguar-screen")
-        self.assertEqual(active, ":ddkioskbrowser:dd-graphics-imxg2d")
-        self.assertNotIn("dd-graphics-etnaviv", active)
+        self.assertEqual(active, ":ddkioskbrowser:dd-graphics-etnaviv")
+        self.assertNotIn("dd-graphics-imxg2d", active)
         self.assertIn('DISTRO_FEATURES:remove:dd-graphics-imxg2d = "etnaviv"', self.contract)
 
     def test_other_kiosk_machines_keep_existing_backend(self):
@@ -100,7 +100,7 @@ class G2DSelectionTests(unittest.TestCase):
                 if re.match(r'^(?:PACKAGECONFIG|PROVIDES|DEPENDS|RRECOMMENDS).*=', line):
                     self.assertIn(":dd-graphics-etnaviv", line)
 
-    def test_screen_launcher_keeps_required_g2d_and_debug_guard(self):
+    def test_screen_launcher_selects_backend_and_keeps_debug_guard(self):
         display = DISPLAY.read_text()
         self.assertIn("'use-g2d=false', 'use-g2d=true'", display)
         self.assertIn("'etnaviv', '', '--use-g2d'", display)

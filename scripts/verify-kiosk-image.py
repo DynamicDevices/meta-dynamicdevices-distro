@@ -31,6 +31,7 @@ ARTIFACT_FILES = (
     '/etc/systemd/system/weston.service.d/screen.conf',
     '/usr/share/dd-kiosk-browser/offline.html',
     '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
+    '/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf',
     '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
 )
 
@@ -181,7 +182,24 @@ def verify_wic_partitions(wic_gz, ota_gz):
     print(f'WIC boot FAT and OTA root copy: verified in {wic_gz}')
 
 
+def verify_etnaviv_weston(rootfs):
+    """Reject stale G2D launchers and a missing GL runtime in the candidate."""
+    vendor = rootfs / 'usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf'
+    if not vendor.is_file():
+        raise ValueError('rootfs lacks deployment-owned Etnaviv Weston override')
+    command = vendor.read_text()
+    if '--use-g2d' in command or '--use-pixman' in command:
+        raise ValueError('rootfs Etnaviv Weston override selects a non-GL renderer')
+    if 'ExecStart=\n' not in command or '--config=/etc/xdg/weston/weston-screen.ini' not in command:
+        raise ValueError('rootfs Etnaviv Weston override lacks command reset or screen config')
+    if not any(rootfs.glob('usr/lib*/libweston-*/gl-renderer.so')):
+        raise ValueError('rootfs Etnaviv Weston lacks gl-renderer.so')
+    if any(rootfs.glob('usr/lib*/libweston-*/g2d-renderer.so')):
+        raise ValueError('rootfs Etnaviv Weston includes the NXP G2D renderer')
+
+
 def verify_rootfs(rootfs):
+    verify_etnaviv_weston(rootfs)
     required = (
         'usr/bin/chromium',
         'usr/bin/dd-kiosk-browser',

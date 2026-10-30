@@ -12,11 +12,11 @@ DD_PRODUCT_FEATURES ?= ""
 # The kiosk manifest carries its own pinned Chromium and Rust-mixin layers.
 # Limit their provider choices to kiosk builds so this shared distro contract
 # does not alter any existing product's toolchain or recipe selection.  The
-# graphics backend is selected independently of the browser. The Screen uses
-# NXP's G2D compositor and matching BSP EGL/GBM/GLES providers; other kiosk
-# machines retain the existing Mesa/Etnaviv default.
+# graphics backend is selected independently of the browser. Chromium kiosks,
+# including the Screen, use matching Mesa/Etnaviv EGL/GBM/GLES providers and
+# Weston's GL renderer. Do not select Vivante merely to satisfy a stale launcher.
 DD_KIOSK_GRAPHICS_BACKEND ?= "etnaviv"
-DD_KIOSK_GRAPHICS_BACKEND:imx8mm-jaguar-screen = "imxg2d"
+DD_KIOSK_GRAPHICS_BACKEND:imx8mm-jaguar-screen = "etnaviv"
 OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-' + d.getVar('DD_KIOSK_GRAPHICS_BACKEND') if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
 RUSTVERSION:ddkioskbrowser = "1.98.1"
 PREFERRED_VERSION_nativesdk-cargo:ddkioskbrowser = "${RUSTVERSION}"

@@ -2,9 +2,20 @@
 # Weston's normal GL renderer and must not pull virtual/libg2d/libgal-imx.
 PACKAGECONFIG_G2D:dd-graphics-etnaviv = ""
 PACKAGECONFIG:remove:dd-graphics-etnaviv = "imxg2d"
+PACKAGECONFIG:append:dd-graphics-etnaviv = " egl"
 
-# The Screen service deliberately requires --use-g2d. Build the corresponding
-# NXP renderer instead of inheriting a GL-only compositor from the kiosk path.
+# Check the renderer we actually intend to start, not just a successful link.
+do_install:append:dd-graphics-etnaviv() {
+    if [ ! -f ${D}${libdir}/libweston-${WESTON_MAJOR_VERSION}/gl-renderer.so ]; then
+        bbfatal "Etnaviv graphics backend selected but Weston GL renderer is missing"
+    fi
+    if [ -f ${D}${libdir}/libweston-${WESTON_MAJOR_VERSION}/g2d-renderer.so ]; then
+        bbfatal "Etnaviv graphics backend must not ship the NXP G2D renderer"
+    fi
+}
+
+# Explicit G2D users still require the matching NXP renderer. The Screen kiosk
+# no longer selects this backend.
 PACKAGECONFIG_G2D:dd-graphics-imxg2d = "imxg2d"
 
 # Fail during image preparation rather than shipping a compositor that rejects

@@ -5,28 +5,43 @@ This record applies to `imx8mm-jaguar-screen` with
 factory target, image checksums, and observed results together. A local parse
 or recipe build does not count as hardware acceptance.
 
-## Screen G2D graphics contract
+## Screen Etnaviv graphics contract
 
-The Screen kiosk selects `DD_KIOSK_GRAPHICS_BACKEND = "imxg2d"`; other kiosk
-machines retain the existing Etnaviv default. The Screen must use the BSP's
-matching Vivante EGL/GBM/GLES providers and NXP Weston's `imxg2d` renderer.
-Do not remove `--use-g2d` merely to make a GL-only compositor start, or mix
-Mesa userspace providers and old deployment libraries into the NXP stack.
+The Screen kiosk selects `DD_KIOSK_GRAPHICS_BACKEND = "etnaviv"`, matching the
+other kiosk machines. Use the Etnaviv kernel driver, Mesa EGL/GBM/GLES providers
+and Weston's GL renderer together. Do not mix these with Vivante's proprietary
+userspace or request `--use-g2d`. Non-kiosk Screen products retain their existing
+NXP G2D policy; the explicit `imxg2d` backend remains available where selected.
+
+Weston's Etnaviv install guard requires `gl-renderer.so` and rejects a leftover
+`g2d-renderer.so`. The Screen rootfs generator writes a later-sorting vendor
+drop-in, `zzzzzz-screen-etnaviv.conf`, using the same GL command as its generated
+`screen.conf`. This is necessary because OSTree can preserve an older locally
+modified `/etc/systemd/system/weston.service.d/screen.conf` requesting G2D.
+The vendor drop-in lives in `/usr`, so it follows image deployment and rollback.
+Its debug/capture option remains conditional on development `debug-tweaks`.
+
+Before installation, back up and inspect the board's exact Weston configuration
+and drop-ins against the candidate; do not change the running G2D image to use
+GL libraries in place. After OTA, verify the effective command selects GL, the
+current invocation loads Mesa and the GL renderer, the kernel exposes Etnaviv,
+and the homepage is `https://active-esl.com`. Confirm actual rendering on the
+physical panel. An active DRM scanout, lit backlight, screenshot or running
+browser alone does not establish visible success. Keep rollback available.
+
+### Earlier failed candidates
 
 Target 3010 installed successfully but failed hardware acceptance: its kiosk
 profile disabled `imxg2d` and selected Mesa while the board retained a Screen
 service override requesting `--use-g2d`. The latest Weston invocation ended
 with `fatal: unhandled option: --use-g2d`. This is not a Chromium compile error.
 
-The replacement must build `g2d-renderer.so`; the Weston installation task
-fails if it is missing. Before accepting the image, record the exact source,
-manifest, target and active OSTree hash; confirm G2D initialises in the current
-Weston invocation, then test Chromium rendering and its actual GPU backend.
-The prior source recorded Chromium compatibility trouble with Vivante, so
-restoring provider selection is a candidate fix, not proof that Chromium works.
-Inspect any retained `/etc` overrides against the new image. Preserve sandbox,
-policy and development-only screenshot restrictions. Require visible panel,
-orientation and touch evidence, plus audio playback where applicable.
+Target 3012 restored NXP G2D/Vivante and started Weston and Chromium, but the
+physical panel remained black. Chromium reported graphics entrypoint lookup
+failures. That evidence makes the Vivante path suspect, not a proven cause.
+The Etnaviv replacement must pass the visible-panel test before acceptance.
+Preserve sandbox, policy and development-only screenshot restrictions. Record
+orientation and touch evidence, plus audio playback where applicable, separately.
 
 ## Artifact checks
 
@@ -38,6 +53,8 @@ both sides select the same ABI. Do not replace this with an implementation-only
 include or a direct `__GBM__` definition that could suppress header contents.
 The local fixture reproduces both mismatch directions and verifies the corrected
 link, but only a successful Foundries build proves the full Chromium link.
+That G2D-only flag remains inactive for the Screen's Etnaviv backend; it is not
+a runtime fix for Chromium rendering under Vivante.
 
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.

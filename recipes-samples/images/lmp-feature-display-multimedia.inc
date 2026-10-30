@@ -19,8 +19,8 @@ CORE_IMAGE_BASE_INSTALL += " \
 # counter-clockwise from its native scan direction.  Apply that transform at
 # the compositor so every client (Flutter, Godot and video) shares the same
 # logical orientation; applications must not compensate independently.
-# Weston remains G2D accelerated, with a persistent runtime directory,
-# branded background and GPU access.
+# Weston uses GL with Etnaviv or G2D with the NXP stack, with a persistent
+# runtime directory, branded background and GPU access.
 configure_jaguar_screen_weston() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
@@ -61,6 +61,16 @@ SupplementaryGroups=render video
 # tied to DEV_MODE/debug-tweaks so production images do not expose capture.
 ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} --drm-device=card1 --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
+
+    # OSTree preserves locally modified /etc drop-ins. A later-sorting vendor
+    # drop-in carries the new kiosk command even when an old screen.conf still
+    # requests --use-g2d. Keep it in /usr so it follows deployment and rollback;
+    # copy the same generated command so the two launchers cannot diverge.
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser etnaviv', 'true', 'false', d)}; then
+        install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d
+        install -m 0644 ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf \
+            ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d/zzzzzz-screen-etnaviv.conf
+    fi
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/jaguar-screen-weston.conf <<'EOF'
