@@ -5,6 +5,14 @@ url=${DD_KIOSK_URL:-file:///usr/share/dd-kiosk-browser/offline.html}
 state_dir=${STATE_DIRECTORY:-/var/lib/dd-kiosk-browser}
 runtime_dir=/run/user/$(id -u)
 
+# Board provisioning may require silent unattended startup. Keep this explicit
+# rather than inheriting test-launcher overrides or changing mixer/driver state.
+case "${DD_KIOSK_MUTE_AUDIO:-0}" in
+    0) set -- ;;
+    1) set -- --mute-audio ;;
+    *) echo "DD_KIOSK_MUTE_AUDIO must be 0 or 1" >&2; exit 1 ;;
+esac
+
 case "$url" in
     http://*) location=${url#http://} ;;
     https://*) location=${url#https://} ;;
@@ -31,7 +39,7 @@ while [ "$attempt" -lt 30 ]; do
         export WAYLAND_DISPLAY="${socket##*/}"
         export LC_ALL=C
         # shellcheck disable=SC2093
-        exec /usr/bin/chromium --ozone-platform=wayland --kiosk \
+        exec /usr/bin/chromium "$@" --ozone-platform=wayland --kiosk \
             --no-first-run --no-default-browser-check \
             --hide-crash-restore-bubble \
             --user-data-dir="$state_dir/profile" "$url"
