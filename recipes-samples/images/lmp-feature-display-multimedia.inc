@@ -22,6 +22,34 @@ CORE_IMAGE_BASE_INSTALL += " \
 # Weston uses GL with Etnaviv or G2D with the NXP stack, with a persistent
 # runtime directory, branded background and GPU access.
 configure_jaguar_screen_weston() {
+    # DRM card numbers change when Etnaviv probes. Select the display driver,
+    # never the render-only GPU or the early simple-framebuffer device.
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', 'true', 'false', d)}; then
+        install -d ${IMAGE_ROOTFS}${libexecdir}
+        cat > ${IMAGE_ROOTFS}${libexecdir}/dd-screen-weston <<'EOF'
+#!/bin/sh
+set -eu
+chosen=
+for candidate in /sys/class/drm/card[0-9]*; do
+    [ -e "$candidate/device/driver" ] || continue
+    case "$(readlink -f "$candidate/device/driver")" in
+        */imx-drm)
+            if [ -n "$chosen" ]; then
+                echo "Multiple imx-drm display controllers; refusing ambiguous selection" >&2
+                exit 1
+            fi
+            chosen=$(basename "$candidate")
+            ;;
+    esac
+done
+if [ -z "$chosen" ]; then
+    echo "No imx-drm display controller; refusing software/display fallback" >&2
+    exit 1
+fi
+exec /usr/bin/weston --drm-device="$chosen" "$@"
+EOF
+        chmod 0755 ${IMAGE_ROOTFS}${libexecdir}/dd-screen-weston
+    fi
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
 [core]
@@ -59,7 +87,7 @@ ExecStart=
 SupplementaryGroups=render video
 # Weston's debug extension authorises weston-screenshooter. Keep it strictly
 # tied to DEV_MODE/debug-tweaks so production images do not expose capture.
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} --drm-device=card1 --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
+ExecStart=${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', d.getVar('libexecdir') + '/dd-screen-weston', '/usr/bin/weston', d)} --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--drm-device=card1', d)} --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
 
     # OSTree preserves locally modified /etc drop-ins. A later-sorting vendor
@@ -70,6 +98,11 @@ EOF
         install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d
         install -m 0644 ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf \
             ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d/zzzzzz-screen-etnaviv.conf
+        install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}/dd-kiosk-browser.service.d
+        cat > ${IMAGE_ROOTFS}${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf <<'EOF'
+[Service]
+Environment=DD_KIOSK_GLES2_COMPAT=1
+EOF
     fi
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d

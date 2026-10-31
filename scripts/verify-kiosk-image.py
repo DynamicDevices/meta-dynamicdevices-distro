@@ -194,12 +194,20 @@ def verify_etnaviv_weston(rootfs):
         raise ValueError('rootfs Etnaviv Weston override lacks command reset or screen config')
     if not any(rootfs.glob('usr/lib*/libweston-*/gl-renderer.so')):
         raise ValueError('rootfs Etnaviv Weston lacks gl-renderer.so')
+    selector = rootfs / 'usr/libexec/dd-screen-weston'
+    if ('ExecStart=/usr/libexec/dd-screen-weston ' not in command or
+            '--drm-device=' in command or not selector.is_file() or
+            not selector.stat().st_mode & 0o111):
+        raise ValueError('rootfs Etnaviv Weston lacks executable dynamic display selector')
     if any(rootfs.glob('usr/lib*/libweston-*/g2d-renderer.so')):
         raise ValueError('rootfs Etnaviv Weston includes the NXP G2D renderer')
 
 
 def verify_rootfs(rootfs):
     verify_etnaviv_weston(rootfs)
+    context = rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf'
+    if not context.is_file() or 'Environment=DD_KIOSK_GLES2_COMPAT=1' not in context.read_text():
+        raise ValueError('rootfs lacks Screen ES2 Chromium compatibility policy')
     required = (
         'usr/bin/chromium',
         'usr/bin/dd-kiosk-browser',

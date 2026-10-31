@@ -13,6 +13,15 @@ case "${DD_KIOSK_MUTE_AUDIO:-0}" in
     *) echo "DD_KIOSK_MUTE_AUDIO must be 0 or 1" >&2; exit 1 ;;
 esac
 
+# GC600 supports ES2. Chromium 147 otherwise rejects its context and disables
+# hardware compositing. Only the Screen Etnaviv image opts into this fallback;
+# keep the sandbox and GPU driver workarounds unchanged.
+case "${DD_KIOSK_GLES2_COMPAT:-0}" in
+    0) ;;
+    1) set -- "$@" --disable-features=FallbackToSWIfGLES3NotSupported ;;
+    *) echo "DD_KIOSK_GLES2_COMPAT must be 0 or 1" >&2; exit 1 ;;
+esac
+
 case "$url" in
     http://*) location=${url#http://} ;;
     https://*) location=${url#https://} ;;

@@ -21,6 +21,21 @@ modified `/etc/systemd/system/weston.service.d/screen.conf` requesting G2D.
 The vendor drop-in lives in `/usr`, so it follows image deployment and rollback.
 Its debug/capture option remains conditional on development `debug-tweaks`.
 
+The Etnaviv command uses `/usr/libexec/dd-screen-weston` to select the unique
+`imx-drm` display controller from sysfs. Never pin the display to `card1`:
+on target 3017 Etnaviv occupies `card1`, while the DSI display is `card2`.
+The selector rejects missing or ambiguous display controllers rather than
+using the render-only GPU or the early simple-framebuffer device. This policy
+is independent of DEV_MODE; production still omits the debug extension.
+
+GC600 exposes OpenGL ES 2.0. Chromium 147's
+`FallbackToSWIfGLES3NotSupported` feature otherwise rejects that context and
+disables hardware compositing. Only the Screen Etnaviv kiosk sets
+`DD_KIOSK_GLES2_COMPAT=1`; the native launcher then disables that feature so
+normal ES2 context fallback remains available. This does not disable the
+sandbox, ignore the GPU blocklist, or enable software rendering. Verify the
+actual renderer and compositing status, not just a running GPU process.
+
 Before installation, back up and inspect the board's exact Weston configuration
 and drop-ins against the candidate; do not change the running G2D image to use
 GL libraries in place. After OTA, verify the effective command selects GL, the
