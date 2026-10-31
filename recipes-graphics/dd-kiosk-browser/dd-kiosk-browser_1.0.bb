@@ -14,6 +14,7 @@ SRC_URI = " \
     file://dd-kiosk-native-runtime.conf \
 "
 SRC_URI:append = "${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', ' file://dd-kiosk-browser-audio.conf', '', d)}"
+SRC_URI:append:imx8mm-jaguar-screen = "${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', ' file://dd-kiosk-browser-screen-audio.conf', '', d)}"
 
 S = "${WORKDIR}"
 
@@ -49,5 +50,12 @@ do_install() {
     fi
 }
 
+do_install:append:imx8mm-jaguar-screen() {
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'true', 'false', d)}; then
+        install -m 0644 ${WORKDIR}/dd-kiosk-browser-screen-audio.conf ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d/screen-audio.conf
+    fi
+}
+
 CONFFILES:${PN} = "${sysconfdir}/default/dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json"
 FILES:${PN} += "${datadir}/dd-kiosk-browser/offline.html ${libexecdir}/dd-kiosk-linker-guard ${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser ${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json ${systemd_system_unitdir}/weston.service.d/zzzz-kiosk-linker-guard.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/audio.conf ${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzz-native-runtime.conf"
+FILES:${PN}:append:imx8mm-jaguar-screen = " ${systemd_system_unitdir}/dd-kiosk-browser.service.d/screen-audio.conf"
