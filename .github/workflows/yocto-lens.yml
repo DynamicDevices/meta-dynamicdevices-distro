@@ -8,6 +8,7 @@ on:
       - '**/*.bbappend'
       - '**/*.inc'
       - 'conf/**'
+      - 'tests/**'
       - '.github/workflows/yocto-lens.yml'
   pull_request:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - '**/*.bbappend'
       - '**/*.inc'
       - 'conf/**'
+      - 'tests/**'
       - '.github/workflows/yocto-lens.yml'
   workflow_dispatch:
     inputs:
@@ -37,6 +39,9 @@ jobs:
     steps:
       - name: Checkout distro layer
         uses: actions/checkout@v4
+
+      - name: Check optional layer registration
+        run: python3 -m unittest discover -s tests -v
 
       - name: Checkout BSP layer
         uses: actions/checkout@v4
