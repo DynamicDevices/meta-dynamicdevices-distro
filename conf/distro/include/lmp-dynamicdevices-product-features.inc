@@ -2,12 +2,16 @@
 #
 # DISTRO policy remains in lmp-dynamicdevices.conf.  Factory/product
 # configurations select optional software capabilities through
-# DD_PRODUCT_FEATURES.  An empty value is the minimal/headless default.
+# DD_PRODUCT_FEATURES. Display-capable products default to the headed bundle;
+# an explicit DD_PRODUCT_FEATURES assignment can still select a headless image.
 #
 # Keep the mapping to standard/existing DISTRO_FEATURES here so recipes can
 # continue to use Yocto feature checks while products migrate incrementally.
 
-DD_PRODUCT_FEATURES ?= ""
+DD_PRODUCT_FEATURES ?= "${@bb.utils.contains('MACHINE_FEATURES', 'display-multimedia', 'display', '', d)}"
+
+# A headed product uses the common boot/desktop artwork unless opted out.
+DD_DISPLAY_BOOT_SPLASH ?= "1"
 
 DD_PRODUCT_FEATURES_VALID = " \
     alsa \
@@ -23,8 +27,8 @@ DD_PRODUCT_FEATURES_VALID = " \
     wayland \
 "
 
-# The canonical distro is headless/minimal unless a product opts into a
-# graphical or audio runtime. Conditional removal is used instead of a fixed
+# Machines without the explicit interactive-display capability stay minimal.
+# Conditional removal is used instead of a fixed
 # :remove so a selected bundle can re-enable its prerequisites.
 DISTRO_FEATURES:remove = " \
     x11 directfb \
@@ -41,6 +45,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'alsa', 'alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'audio', 'alsa pulseaudio', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'display', 'display-runtime wayland opengl pipewire', '', d)} \
+    ${@'display-boot-splash' if d.getVar('DD_DISPLAY_BOOT_SPLASH') == '1' and set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'flutter', 'godot'} else ''} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \

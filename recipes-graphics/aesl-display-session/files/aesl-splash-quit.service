@@ -1,0 +1,15 @@
+[Unit]
+Description=Release boot splash after Weston reports ready
+Requires=weston.service
+After=weston.service psplash-start.service
+
+[Service]
+Type=oneshot
+ExecStart=-/usr/bin/psplash-write QUIT
+TimeoutStartSec=5s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=weston.service

@@ -40,15 +40,20 @@ jobs:
       - name: Checkout distro layer
         uses: actions/checkout@v4
 
-      - name: Check optional layer registration
-        run: python3 -m unittest discover -s tests -v
-
       - name: Checkout BSP layer
         uses: actions/checkout@v4
         with:
           repository: DynamicDevices/meta-dynamicdevices-bsp
           path: meta-dynamicdevices-bsp
           ref: main
+
+      - name: Check layer and display-splash fixtures
+        env:
+          BSP_ROOT: ${{ github.workspace }}/meta-dynamicdevices-bsp
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/display-splash-tests"
+          "${RUNNER_TEMP}/display-splash-tests/bin/pip" install Pillow==12.1.1
+          "${RUNNER_TEMP}/display-splash-tests/bin/python" -m unittest discover -s tests -v
 
       - name: Run yocto-lens static scan
         working-directory: meta-dynamicdevices-bsp

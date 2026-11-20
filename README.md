@@ -1,5 +1,28 @@
 # meta-dynamicdevices-distro
 
+## Display-board defaults
+
+Machines explicitly declaring `MACHINE_FEATURES += "display-multimedia"`
+default to `DD_PRODUCT_FEATURES = "display"`: Wayland/Weston, multimedia and
+the `display-boot-splash` distro feature. DT510 and Jaguar Screen declare that
+capability; inherited EVK `screen` flags and static e-ink do not enable it.
+Existing networking, OTA, audit and other selected product features remain.
+
+The boot splash and clean Weston background share AESL artwork. Display-VT
+kernel output/gettys are suppressed, but serial diagnostics are retained.
+PSplash remains until Weston reports ready; compositor READY is not proof of a
+visible desktop frame. The U-Boot-to-Linux hardware reset can still introduce a
+blank interval. DT510's build704 U-Boot splash was visibly confirmed on two
+warm reboots; this Linux/desktop handover still requires build and bench tests.
+
+Set `DD_DISPLAY_BOOT_SPLASH = "0"` to retain a headed desktop without the new
+splash policy. Set `DD_PRODUCT_FEATURES = ""` (or a non-display bundle) for a
+headless product; remove any factory-specific forced `display` append too.
+For local display-console debugging create `/etc/aesl-enable-display-getty`;
+kernel display-console arguments require a separately selected debug image.
+
+Assisted-by: Briar.
+
 **Professional Yocto Distribution Layer for Dynamic Devices Edge Computing Platforms**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)

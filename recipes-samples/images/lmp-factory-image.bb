@@ -85,9 +85,10 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'zigbee', 'recipes-samples/imag
 require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/images/lmp-feature-eink-power.inc', '', d)}
 
 # Enable the display/multimedia software stack only when product configuration
-# requests it. MACHINE_FEATURES declares capability and is validated by the
-# product-feature contract; it must not implicitly install product software.
+# requests it. The product contract defaults explicitly display-capable boards
+# to the headed bundle while retaining an explicit headless opt-out.
 require ${@bb.utils.contains('DISTRO_FEATURES', 'display-runtime', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
+require ${@bb.utils.contains('DISTRO_FEATURES', 'display-boot-splash', 'recipes-samples/images/lmp-feature-display-boot-splash.inc', '', d)}
 
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}

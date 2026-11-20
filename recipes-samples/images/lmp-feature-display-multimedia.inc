@@ -30,7 +30,7 @@ repaint-window=16
 idle-time=0
 
 [shell]
-background-image=/usr/share/screen-splash/active-edge-splash-1200x1920.png
+background-image=${@bb.utils.contains('DISTRO_FEATURES', 'display-boot-splash', '/usr/share/aesl-display-splash/splash.png', '/usr/share/screen-splash/active-edge-splash-1200x1920.png', d)}
 background-type=scale
 background-color=0xff07111f
 panel-position=none
