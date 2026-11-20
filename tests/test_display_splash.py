@@ -45,6 +45,115 @@ def expression(text, variable, data):
 
 
 class DisplaySplashTest(unittest.TestCase):
+    def test_factory_legacy_entry_routes_display_to_real_headed_distro(self):
+        entry = (DISTRO / "conf/distro/lmp-dynamicdevices-headless.conf").read_text()
+        expr = re.search(r'DD_LEGACY_DISTRO_PROFILE = "\$\{@(.*)\}"', entry)[1]
+        env = {"bb": types.SimpleNamespace(utils=types.SimpleNamespace(contains=contains))}
+        for machine, hardware, profile in [("imx8mm-jaguar-dt510", "display-multimedia", "display"), ("imx8mm-jaguar-screen", "display-multimedia", "display"), ("imx93-jaguar-eink", "screen", "headless"), ("imx8mm-jaguar-sentai", "wifi", "headless")]:
+            with self.subTest(machine=machine):
+                env["d"] = Data(MACHINE=machine, MACHINE_FEATURES=hardware)
+                self.assertEqual(eval(expr, env), profile)
+                target = re.search(r"^require (.+)$", entry, re.M)[1].replace("${DD_LEGACY_DISTRO_PROFILE}", profile)
+                policy = (DISTRO / target).read_text()
+                if profile == "display":
+                    self.assertIn("require conf/distro/lmp-dynamicdevices.conf", policy)
+                    headed = (DISTRO / "conf/distro/lmp-dynamicdevices.conf").read_text()
+                    self.assertIn('DISTRO = "lmp-dynamicdevices"', headed)
+                    self.assertIn("require conf/distro/include/lmp-dynamicdevices-product-features.inc", headed)
+                    self.assertIn('PREFERRED_VERSION_u-boot-fio = "2024.04%"', policy)
+                    self.assertIn('PREFERRED_VERSION_u-boot-fio-imx = "2024.04%"', policy)
+                else:
+                    self.assertIn('DISTRO = "lmp-dynamicdevices-headless"', policy)
+
+    def test_non_display_legacy_policy_is_byte_preserved(self):
+        policy = (DISTRO / "conf/distro/include/lmp-dynamicdevices-headless-compat.inc").read_text()
+        original = policy.replace("# Legacy headless fallback: retain existing policy for non-display machines.\n", "", 1)
+        self.assertEqual(hashlib.sha256(original.encode()).hexdigest(), "77e04240ae9445b6e085a050507b6d080c4a0ed4dd84b832e79ab89c8ba058df")
+
+    def test_assembled_image_gate_rejects_705_failure(self):
+        recipe = (DISTRO / "recipes-samples/images/lmp-factory-image.bb").read_text()
+        body = re.search(r"python do_rootfs:append\(\) \{\n(.*?)\n\}", recipe, re.S)[1]
+        def fatal(message):
+            raise RuntimeError(message)
+        env = {"bb": types.SimpleNamespace(fatal=fatal)}
+        exec(compile("def check(d):\n" + textwrap.indent(textwrap.dedent(body), "    "), "image-payload-gate", "exec"), env)
+        check = env['check']
+        with tempfile.TemporaryDirectory() as temp:
+            data = Data(IMAGE_ROOTFS=temp, DISTRO="lmp-dynamicdevices-headless", DD_PRODUCT_FEATURES="display alsa usb-gadget", DISTRO_FEATURES="alsa usbgadget", OSTREE_KERNEL_ARGS="console=tty1 console=ttymxc1,115200 root=LABEL=otaroot")
+            with self.assertRaisesRegex(RuntimeError, "missing distro features"):
+                check(data)
+            data.setVar('DISTRO_FEATURES', 'display-runtime wayland opengl display-boot-splash')
+            with self.assertRaisesRegex(RuntimeError, "missing /usr/bin/weston"):
+                check(data)
+            for name in ('usr/bin/weston', 'usr/share/aesl-display-splash/splash.png', 'etc/xdg/weston/weston-aesl.ini', 'usr/lib/systemd/system/aesl-splash-quit.service'):
+                path = Path(temp) / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+                if name.startswith('usr/bin/'):
+                    path.chmod(0o755)
+            link = Path(temp) / 'usr/bin/psplash'
+            link.symlink_to('/etc/alternatives/aesl-psplash-fixture')
+            with self.assertRaisesRegex(RuntimeError, "missing /usr/bin/psplash"):
+                check(data)
+            alternatives = Path(temp) / 'etc/alternatives'
+            alternatives.mkdir(parents=True)
+            (alternatives / 'aesl-psplash-fixture').symlink_to('../../usr/bin/psplash-default')
+            target = Path(temp) / 'usr/bin/psplash-default'
+            target.touch()
+            target.chmod(0o755)
+            with self.assertRaisesRegex(RuntimeError, "display-VT kernel console"):
+                check(data)
+            data.setVar('OSTREE_KERNEL_ARGS', 'console=ttymxc1,115200 root=LABEL=otaroot splash')
+            check(data)
+            target.chmod(0o644)
+            with self.assertRaisesRegex(RuntimeError, "non-executable /usr/bin/psplash"):
+                check(data)
+            target.chmod(0o755)
+            link.unlink()
+            link.symlink_to('//usr/bin/psplash-default')
+            check(data)
+            link.unlink()
+            link.symlink_to('/usr/bin/psplash')
+            with self.assertRaisesRegex(RuntimeError, "missing /usr/bin/psplash"):
+                check(data)
+            link.unlink()
+            link.symlink_to('../../../../etc/passwd')
+            with self.assertRaisesRegex(RuntimeError, "missing /usr/bin/psplash"):
+                check(data)
+            data.setVar('DD_DISPLAY_BOOT_SPLASH', '0')
+            data.setVar('DISTRO_FEATURES', 'display-runtime wayland opengl')
+            check(data)
+            data.setVar('DD_PRODUCT_FEATURES', 'alsa')
+            data.setVar('DISTRO_FEATURES', 'alsa')
+            check(data)
+
+    def test_legacy_screen_bundle_and_explicit_optout(self):
+        policy = (DISTRO / "conf/distro/include/lmp-dynamicdevices-display-compat.inc").read_text()
+        self.assertEqual(expression(policy, "DD_PRODUCT_FEATURES", Data(MACHINE="imx8mm-jaguar-screen")), "display flutter godot alsa")
+        self.assertEqual(expression(policy, "DD_PRODUCT_FEATURES", Data(MACHINE="imx8mm-jaguar-dt510")), "display")
+        self.assertNotRegex(policy, r"DD_PRODUCT_FEATURES(?:\s*=|:append)")
+        self.assertIn('DISTRO_FEATURES:append:imx8mm-jaguar-dt510 = " improv"', policy)
+
+    def test_effective_product_removals_survive_distro_include(self):
+        contract = (DISTRO / "conf/distro/include/lmp-dynamicdevices-product-features.inc").read_text()
+        headed = (DISTRO / "conf/distro/lmp-dynamicdevices.conf").read_text()
+        self.assertNotRegex(headed, r'(?m)^DISTRO_FEATURES:remove\s*=', "Canonical distro must not overwrite product removals")
+        base = {'wayland', 'opengl', 'alsa', 'pulseaudio', 'vulkan', 'x11', 'directfb', 'zeroconf', 'wifi', 'systemd', 'sota', 'cra-audit'}
+        for selected in ('', 'alsa usb-gadget', 'display alsa usb-gadget'):
+            with self.subTest(selected=selected):
+                data = Data(DD_PRODUCT_FEATURES=selected, DD_DISPLAY_BOOT_SPLASH='1')
+                env = {"d": data, "bb": types.SimpleNamespace(utils=types.SimpleNamespace(contains=contains))}
+                expanded = '\n'.join(re.sub(r'\$\{@(.*)\}', lambda m: str(eval(m[1], env)), line) for line in contract.splitlines())
+                removals = re.search(r'^DISTRO_FEATURES:remove = "(.*?)"', expanded, re.M | re.S)[1]
+                effective = base - set(removals.replace('\\\n', ' ').split())
+                self.assertTrue({'wifi', 'systemd', 'sota', 'cra-audit'} <= effective)
+                self.assertFalse({'zeroconf', 'x11', 'directfb', 'pulseaudio', 'vulkan'} & effective)
+                if 'display' in selected:
+                    self.assertTrue({'wayland', 'opengl', 'alsa'} <= effective)
+                else:
+                    self.assertFalse({'wayland', 'opengl'} & effective)
+                    self.assertEqual('alsa' in effective, 'alsa' in selected)
+
     def test_default_is_explicit_interactive_capability_not_evk_screen(self):
         contract = (DISTRO / "conf/distro/include/lmp-dynamicdevices-product-features.inc").read_text()
         for hardware, expected in [("display-multimedia", "display"), ("screen", ""), ("wifi bluetooth", "")]:

@@ -90,6 +90,68 @@ require ${@bb.utils.contains('MACHINE_FEATURES', 'el133uf1', 'recipes-samples/im
 require ${@bb.utils.contains('DISTRO_FEATURES', 'display-runtime', 'recipes-samples/images/lmp-feature-display-multimedia.inc', '', d)}
 require ${@bb.utils.contains('DISTRO_FEATURES', 'display-boot-splash', 'recipes-samples/images/lmp-feature-display-boot-splash.inc', '', d)}
 
+# Validate the actual selected distro and assembled image, not just the feature
+# mapping include in isolation. Build705 silently bypassed that include via an
+# old Factory Definition's -headless entry point.
+python do_rootfs:append() {
+    from pathlib import Path, PurePosixPath
+    import os
+    import re
+    selected = set((d.getVar('DD_PRODUCT_FEATURES') or '').split())
+    features = set((d.getVar('DISTRO_FEATURES') or '').split())
+    if selected & {'display', 'flutter', 'godot'}:
+        required = {'display-runtime', 'wayland', 'opengl'}
+        if d.getVar('DD_DISPLAY_BOOT_SPLASH') != '0':
+            required.add('display-boot-splash')
+        missing = required - features
+        if missing:
+            bb.fatal('Selected display product is missing distro features: %s (DISTRO=%s)' %
+                     (' '.join(sorted(missing)), d.getVar('DISTRO')))
+    if 'display-boot-splash' in features:
+        root = Path(d.getVar('IMAGE_ROOTFS'))
+        def image_file(name):
+            # Interpret every absolute link relative to IMAGE_ROOTFS, never
+            # the host filesystem. Walk parent-directory links too, reject
+            # escapes and cap link traversal like the kernel's ELOOP limit.
+            pending, resolved, links = list(PurePosixPath(name).parts), [], 0
+            while pending:
+                part = pending.pop(0)
+                if part in ('', '.'):
+                    continue
+                if part == '..':
+                    if not resolved:
+                        return None
+                    resolved.pop()
+                    continue
+                candidate = root.joinpath(*resolved, part)
+                if candidate.is_symlink():
+                    links += 1
+                    if links > 40:
+                        return None
+                    target = PurePosixPath(os.readlink(candidate))
+                    if target.is_absolute():
+                        resolved = []
+                    pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
+                else:
+                    if pending and not candidate.is_dir():
+                        return None
+                    resolved.append(part)
+            result = root.joinpath(*resolved)
+            return result if result.is_file() else None
+        for name in ('usr/bin/weston', 'usr/bin/psplash',
+                     'usr/share/aesl-display-splash/splash.png',
+                     'etc/xdg/weston/weston-aesl.ini',
+                     (d.getVar('systemd_system_unitdir') or '/usr/lib/systemd/system').lstrip('/') + '/aesl-splash-quit.service'):
+            resolved_file = image_file(name)
+            if resolved_file is None:
+                bb.fatal('Display splash image is missing /%s' % name)
+            if name.startswith('usr/bin/') and not os.access(resolved_file, os.X_OK):
+                bb.fatal('Display splash image has a non-executable /%s' % name)
+        args = (d.getVar('OSTREE_KERNEL_ARGS') or '').split()
+        if any(re.fullmatch(r'console=tty[0-9]+(?:,.*)?', arg) for arg in args):
+            bb.fatal('Display splash image still enables a display-VT kernel console')
+}
+
 # Enable MCUboot support for boards with microcontrollers
 require ${@bb.utils.contains('MACHINE_FEATURES', 'mcuboot', 'recipes-samples/images/lmp-feature-mcuboot.inc', '', d)}
 

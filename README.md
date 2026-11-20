@@ -2,6 +2,18 @@
 
 ## Display-board defaults
 
+Existing Factory Definitions may still select `lmp-dynamicdevices-headless`.
+That entry point now routes explicit `display-multimedia` machines to the real
+`lmp-dynamicdevices` headed policy and identity. Non-display machines retain
+their original legacy configuration byte-for-byte apart from a header comment.
+The compatibility route keeps the previous U-Boot 2024.04 preference, timestamp,
+DT510 onboarding and Screen's UI bundle. No factory settings need changing.
+
+Build705 passed but remained headless because the old entry point did not load
+the product-feature contract. A rootfs-task check now rejects selected display
+products missing the actual features, splash payload or console suppression;
+source fixture success alone is not image acceptance.
+
 Machines explicitly declaring `MACHINE_FEATURES += "display-multimedia"`
 default to `DD_PRODUCT_FEATURES = "display"`: Wayland/Weston, multimedia and
 the `display-boot-splash` distro feature. DT510 and Jaguar Screen declare that
