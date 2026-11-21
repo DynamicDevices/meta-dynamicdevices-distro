@@ -45,6 +45,36 @@ def expression(text, variable, data):
 
 
 class DisplaySplashTest(unittest.TestCase):
+    def test_dt510_retains_first_frame_until_background_commit(self):
+        patch = (DISTRO / 'recipes-graphics/wayland/weston/0001-retain-boot-display-until-background.patch').read_text()
+        self.assertIn('if (ec->boot_background_pending)', patch)
+        self.assertIn('es->buffer_ref.buffer && es->width > 0 && es->height > 0', patch)
+        self.assertIn('weston_compositor_damage_all(shell->compositor)', patch)
+        self.assertIn('shell->startup_animation_type = ANIMATION_NONE', patch)
+        self.assertIn('wl_event_source_timer_update(shell->boot_background_timer, 15000)', patch)
+        self.assertIn('wl_event_source_remove(shell->boot_background_timer)', patch)
+        config = configparser.ConfigParser()
+        machine = SESSION / 'aesl-display-session/imx8mm-jaguar-dt510'
+        config.read(machine / 'weston-aesl.ini')
+        self.assertTrue(config.getboolean('core', 'use-g2d'))
+        self.assertTrue(config.getboolean('shell', 'retain-boot-display'))
+        self.assertEqual(config.get('shell', 'startup-animation'), 'none')
+
+    def test_dt510_psplash_condition_executes_for_fallback_and_retention(self):
+        machine = SESSION / 'aesl-display-session/imx8mm-jaguar-dt510'
+        script = (machine / 'aesl-psplash-needed').read_text()
+        with tempfile.TemporaryDirectory() as temp:
+            status = Path(temp) / 'status'
+            test = Path(temp) / 'condition'
+            test.write_text(script.replace('/sys/class/drm/card[0-9]*/device/aesl_boot_display', str(status)))
+            for value, expected in [(None, 0), (b'fallback\n', 0), (b'retained\n', 1)]:
+                if value is not None:
+                    status.write_bytes(value)
+                self.assertEqual(subprocess.run(['sh', str(test)]).returncode, expected)
+        dropin = (machine / 'psplash-start.conf').read_text()
+        self.assertNotIn('dev-fb0.device', dropin)
+        self.assertIn('ExecCondition=/usr/libexec/aesl-psplash-needed', dropin)
+
     def test_factory_legacy_entry_routes_display_to_real_headed_distro(self):
         entry = (DISTRO / "conf/distro/lmp-dynamicdevices-headless.conf").read_text()
         expr = re.search(r'DD_LEGACY_DISTRO_PROFILE = "\$\{@(.*)\}"', entry)[1]
@@ -253,7 +283,8 @@ setexpr() {
 
     def test_dt510_gpu_access_is_active_seat_only(self):
         recipe = (SESSION / 'aesl-display-session_1.0.bb').read_text()
-        self.assertIn('SRC_URI:append:imx8mm-jaguar-dt510 = " file://70-aesl-galcore.rules"', recipe)
+        dt510_uri = re.search(r'^SRC_URI:append:imx8mm-jaguar-dt510 = "(.*)"$', recipe, re.M)[1].split()
+        self.assertIn('file://70-aesl-galcore.rules', dt510_uri)
         body = re.search(r'do_install:append:imx8mm-jaguar-dt510\(\) \{\n(.*?)\n\}', recipe, re.S)[1]
         rule = (FILES / '70-aesl-galcore.rules').read_text()
         effective = [line for line in rule.splitlines() if line and not line.startswith('#')]
@@ -264,10 +295,16 @@ setexpr() {
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / 'etc/udev/rules.d').mkdir(parents=True)
-            for key, value in {'D': temp, 'WORKDIR': str(FILES), 'sysconfdir': '/etc'}.items():
+            work = root / 'work'
+            work.mkdir()
+            shutil.copy(FILES / '70-aesl-galcore.rules', work)
+            for name in ['aesl-psplash-needed', 'aesl-psplash-start']:
+                shutil.copy(SESSION / 'aesl-display-session/imx8mm-jaguar-dt510' / name, work)
+            for key, value in {'D': temp, 'WORKDIR': str(work), 'sysconfdir': '/etc', 'libexecdir': '/usr/libexec'}.items():
                 body = body.replace('${' + key + '}', value)
             subprocess.run(['sh', '-eu', '-c', body], check=True)
             self.assertEqual((root / 'etc/udev/rules.d/70-aesl-galcore.rules').read_text(), rule)
+            self.assertTrue(os.access(root / 'usr/libexec/aesl-psplash-needed', os.X_OK))
 
     def test_actual_psplash_prepend_runs_and_preserves_default_package(self):
         append = (BSP / "recipes-core/psplash/psplash_%.bbappend").read_text()

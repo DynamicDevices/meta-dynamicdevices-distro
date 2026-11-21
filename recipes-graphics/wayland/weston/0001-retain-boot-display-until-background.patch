@@ -1,0 +1,123 @@
+Subject: [PATCH] desktop-shell: optionally retain scanout until a background is ready
+
+Upstream-Status: Inappropriate [DT510 firmware handover ABI]
+Assisted-by: Briar
+
+diff --git a/include/libweston/libweston.h b/include/libweston/libweston.h
+--- a/include/libweston/libweston.h
++++ b/include/libweston/libweston.h
+@@ -1364,6 +1364,10 @@
+  * \ingroup compositor
+  */
+ struct weston_compositor {
++	/* Desktop shell may retain firmware scanout until a background buffer
++	 * is committed. Zero/default leaves all existing users unchanged.
++	 */
++	bool boot_background_pending;
+ 	struct wl_signal destroy_signal;
+ 
+ 	struct wl_display *wl_display;
+diff --git a/libweston/compositor.c b/libweston/compositor.c
+--- a/libweston/compositor.c
++++ b/libweston/compositor.c
+@@ -3032,6 +3032,14 @@
+ 	if (output->destroying)
+ 		return 0;
+ 
++	/* Do not submit an empty/black first frame. Returning before plane
++	 * assignment also leaves frame callbacks and presentation feedback
++	 * intact. Background commit (or the bounded shell timeout) damages
++	 * all outputs and restarts this normal repaint path, without a loop.
++	 */
++	if (ec->boot_background_pending)
++		return -1;
++
+ 	TL_POINT(ec, "core_repaint_begin", TLP_OUTPUT(output), TLP_END);
+ 
+ 	/* Rebuild the surface list and update surface transforms up front. */
+diff --git a/desktop-shell/shell.h b/desktop-shell/shell.h
+--- a/desktop-shell/shell.h
++++ b/desktop-shell/shell.h
+@@ -82,6 +82,7 @@
+ 
+ struct weston_desktop;
+ struct desktop_shell {
++	struct wl_event_source *boot_background_timer;
+ 	struct weston_compositor *compositor;
+ 	struct weston_desktop *desktop;
+ 	const struct weston_xwayland_surface_api *xwayland_surface_api;
+diff --git a/desktop-shell/shell.c b/desktop-shell/shell.c
+--- a/desktop-shell/shell.c
++++ b/desktop-shell/shell.c
+@@ -2893,6 +2893,17 @@
+ 			(surface->output ? surface->output->name : "NULL"));
+ }
+ 
++static int
++boot_background_timeout(void *data)
++{
++	struct desktop_shell *shell = data;
++
++	weston_log("Boot display: background timeout, releasing initial repaint\n");
++	shell->compositor->boot_background_pending = false;
++	weston_compositor_damage_all(shell->compositor);
++	return 0;
++}
++
+ static void
+ background_committed(struct weston_surface *es,
+ 		     struct weston_coord_surface new_origin)
+@@ -2903,6 +2914,14 @@
+ 	view = container_of(es->views.next, struct weston_view, surface_link);
+ 
+ 	configure_static_view(view, &shell->background_layer, 0, 0);
++	if (shell->compositor->boot_background_pending &&
++	    es->buffer_ref.buffer && es->width > 0 && es->height > 0) {
++		shell->compositor->boot_background_pending = false;
++		if (shell->boot_background_timer)
++			wl_event_source_timer_update(shell->boot_background_timer, 0);
++		weston_log("Boot display: background buffer ready, releasing initial repaint\n");
++		weston_compositor_damage_all(shell->compositor);
++	}
+ }
+ 
+ static void
+@@ -4921,6 +4940,9 @@
+ 
+ 	/* Force state to unlocked so we don't try to fade */
+ 	shell->locked = false;
++	if (shell->boot_background_timer)
++		wl_event_source_remove(shell->boot_background_timer);
++	shell->compositor->boot_background_pending = false;
+ 
+ 	if (shell->child.client) {
+ 		/* disable respawn */
+@@ -5095,6 +5117,28 @@
+ 	shell->text_backend = text_backend_init(ec);
+ 
+ 	shell_configuration(shell);
++	{
++		struct weston_config *config = wet_get_config(ec);
++		struct weston_config_section *section =
++			weston_config_get_section(config, "shell", NULL, NULL);
++		bool retain;
++
++		weston_config_section_get_bool(section, "retain-boot-display",
++					       &retain, false);
++		if (retain) {
++			loop = wl_display_get_event_loop(ec->wl_display);
++			shell->boot_background_timer = wl_event_loop_add_timer(loop,
++				boot_background_timeout, shell);
++			if (!shell->boot_background_timer)
++				return -1;
++			ec->boot_background_pending = true;
++			/* A black fade curtain would defeat an otherwise ready
++			 * matching background. Keep normal lock/idle fades.
++			 */
++			shell->startup_animation_type = ANIMATION_NONE;
++			wl_event_source_timer_update(shell->boot_background_timer, 15000);
++		}
++	}
+ 
+ 	workspace_create(shell);
+ 

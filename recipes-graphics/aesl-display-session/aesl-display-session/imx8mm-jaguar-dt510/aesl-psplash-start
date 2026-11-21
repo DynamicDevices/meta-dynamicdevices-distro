@@ -1,0 +1,10 @@
+#!/bin/sh
+# Fallback only. Bound device discovery instead of giving Weston a permanent
+# dependency on fbdev, which is intentionally absent on successful handover.
+attempt=0
+while [ ! -e /dev/fb0 ]; do
+    [ "$attempt" -lt 15 ] || exit 1
+    sleep 1
+    attempt=$((attempt + 1))
+done
+exec /usr/bin/psplash --no-console-switch

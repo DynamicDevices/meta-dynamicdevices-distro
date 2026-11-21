@@ -2,7 +2,7 @@ SUMMARY = "Console-free AESL splash to Weston session handover"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 SRC_URI = "file://psplash-start.conf file://psplash-progress.conf file://weston-splash.conf file://weston-aesl.ini file://aesl-splash-quit.service file://no-vt-getty.conf"
-SRC_URI:append:imx8mm-jaguar-dt510 = " file://70-aesl-galcore.rules"
+SRC_URI:append:imx8mm-jaguar-dt510 = " file://70-aesl-galcore.rules file://aesl-psplash-needed file://aesl-psplash-start"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 FILESEXTRAPATHS:prepend := "${THISDIR}/${BPN}/${MACHINE}:"
 S = "${WORKDIR}"
@@ -28,10 +28,15 @@ do_install() {
     printf '%s\n' 'SUBSYSTEM=="graphics", KERNEL=="fb0", TAG+="systemd"' > ${D}${sysconfdir}/udev/rules.d/71-aesl-splash.rules
 }
 
+FILES:${PN}:append:imx8mm-jaguar-dt510 = " ${libexecdir}/aesl-psplash-needed ${libexecdir}/aesl-psplash-start"
+
 FILES:${PN} += "${systemd_system_unitdir} ${libdir}/tmpfiles.d"
 
 # Keep the vendor GPU root-owned. logind lends access only to the active
 # local seat, as for DRM; no blanket group/world write and no root compositor.
 do_install:append:imx8mm-jaguar-dt510() {
+    install -d ${D}${libexecdir}
+    install -m 0755 ${WORKDIR}/aesl-psplash-needed ${D}${libexecdir}/
+    install -m 0755 ${WORKDIR}/aesl-psplash-start ${D}${libexecdir}/
     install -m 0644 ${WORKDIR}/70-aesl-galcore.rules ${D}${sysconfdir}/udev/rules.d/
 }

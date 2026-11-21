@@ -1,0 +1,9 @@
+#!/bin/sh
+# The kernel reports actual hardware adoption after all components bind.
+# A firmware descriptor alone is not proof: Linux may have rejected it.
+for status in /sys/class/drm/card[0-9]*/device/aesl_boot_display; do
+    if [ -r "$status" ] && [ "$(cat "$status")" = retained ]; then
+        exit 1
+    fi
+done
+exit 0
