@@ -1,0 +1,3 @@
+# Must sort before 73-seat-late.rules, which applies the active-seat ACL.
+# The kernel's root:root 0600 base permissions remain unchanged.
+SUBSYSTEM=="gpu_class", KERNEL=="galcore", TAG+="seat", TAG+="uaccess"

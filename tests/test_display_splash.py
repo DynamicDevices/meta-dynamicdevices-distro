@@ -184,6 +184,90 @@ class DisplaySplashTest(unittest.TestCase):
         self.assertNotRegex(text, r"(?:loglevel=| quiet|fw_setenv|mmcblk)")
         self.assertIn("video=HDMI-A-1:1280x720@60e", text)
 
+    def test_ota_boot_policy_preserves_non_vt_arguments_and_failure_is_safe(self):
+        fragment = (BSP / "recipes-bsp/u-boot/u-boot-ostree-scr-fit/display-bootargs.cmd").read_text()
+        # Exercise the actual fragment with setexpr's U-Boot 2024.04 no-match
+        # return code (1), not sed's always-success status.
+        shim = r'''
+setenv() {
+    key=$1; shift
+    if test "$#" = 0; then unset "$key"; else export "$key=$*"; fi
+}
+setexpr() {
+    test "$FAIL_REGEX" != 1 || return 1
+    key=$1; shift
+    test "$1" = sub || return 1
+    expr=$2; replacement=$3; value=$4
+    printf '%s\n' "$value" | grep -Eq "$expr" || return 1
+    value=$(printf '%s\n' "$value" | sed -E "s/$expr/$replacement/")
+    export "$key=$value"
+}
+'''
+        original = "console=tty1 console=tty0 console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200 rootfstype=ext4 ostree=/ostree/boot.1/lmp/hash/0 console=tty63 root=/dev/mmcblk2p2 rw audit=1 video=DSI-1:d"
+        for failure in (False, True):
+            for mode in ("", " video=HDMI-A-1:1280x720@60e"):
+                env = dict(os.environ, bootargs=original, FAIL_REGEX=str(int(failure)))
+                script = shim + fragment.replace('@@AESL_DISPLAY_MODE@@', mode) + '\nprintf "%s\\n" "$bootargs"\n'
+                # Hush expands unset environment names to empty strings.
+                actual = subprocess.run(['sh', '-e', '-c', script], env=env, text=True, capture_output=True, check=True).stdout.split()
+                retained = original.split() if failure else [x for x in original.split() if not re.fullmatch(r'console=tty\d+', x)]
+                self.assertEqual(actual, retained + ['splash', 'logo.nologo', 'vt.global_cursor_default=0'] + mode.split())
+        self.assertNotRegex(fragment, r'\b(?:saveenv|fw_setenv|mmc|ext4write|reset)\b')
+
+    def test_ota_boot_policy_is_opt_in_and_after_rollback_before_root(self):
+        append = (BSP / 'recipes-bsp/u-boot/u-boot-ostree-scr-fit.bbappend').read_text()
+        body = re.search(r'python do_unpack:append\(\) \{\n(.*?)\n\}', append, re.S)[1]
+        def fatal(message):
+            raise RuntimeError(message)
+        env = {'bb': types.SimpleNamespace(utils=types.SimpleNamespace(contains=contains), fatal=fatal)}
+        # Model a later task append as well as the isolated function: a return
+        # in this append must not skip subsequent machine-specific appends.
+        exec('def unpack(d):\n' + textwrap.indent(textwrap.dedent(body), '    ') + '\n    d.setVar("LATER_APPEND_RAN", True)\n', env)
+        with tempfile.TemporaryDirectory() as temp:
+            work = Path(temp)
+            original = 'run bootcmd_rollback\nrun bootcmd_bootargs_add_root\nrun bootcmd_load_f\nrun bootcmd_run\nreset\n'
+            footer = work / 'boot-footer.cmd.in'
+            shutil.copy(BSP / 'recipes-bsp/u-boot/u-boot-ostree-scr-fit/display-bootargs.cmd', work)
+            for features, machine in [('systemd', 'imx8mm-jaguar-dt510'), ('display-boot-splash', 'imx8mm-jaguar-dt510'), ('display-boot-splash', 'imx8mm-jaguar-screen')]:
+                footer.write_text(original)
+                data = Data(WORKDIR=temp, DISTRO_FEATURES=features, MACHINE=machine)
+                env['unpack'](data)
+                self.assertTrue(data.getVar('LATER_APPEND_RAN'))
+                actual = footer.read_text()
+                if features == 'systemd':
+                    self.assertEqual(actual, original)
+                else:
+                    self.assertLess(actual.index('run bootcmd_rollback'), actual.index('for aesl_display_arg'))
+                    self.assertLess(actual.index('setenv bootargs'), actual.index('run bootcmd_bootargs_add_root'))
+                    self.assertEqual('video=HDMI-A-1:1280x720@60e' in actual, machine == 'imx8mm-jaguar-dt510')
+            footer.write_text('run bootcmd_run\n')
+            with self.assertRaisesRegex(RuntimeError, 'rollback selection'):
+                env['unpack'](Data(WORKDIR=temp, DISTRO_FEATURES='display-boot-splash'))
+
+    def test_dt510_keeps_hardware_accelerated_renderer(self):
+        config = configparser.ConfigParser()
+        config.read(SESSION / 'aesl-display-session/imx8mm-jaguar-dt510/weston-aesl.ini')
+        self.assertTrue(config.getboolean('core', 'use-g2d'))
+        self.assertFalse(config.getboolean('core', 'use-pixman', fallback=False))
+
+    def test_dt510_gpu_access_is_active_seat_only(self):
+        recipe = (SESSION / 'aesl-display-session_1.0.bb').read_text()
+        self.assertIn('SRC_URI:append:imx8mm-jaguar-dt510 = " file://70-aesl-galcore.rules"', recipe)
+        body = re.search(r'do_install:append:imx8mm-jaguar-dt510\(\) \{\n(.*?)\n\}', recipe, re.S)[1]
+        rule = (FILES / '70-aesl-galcore.rules').read_text()
+        effective = [line for line in rule.splitlines() if line and not line.startswith('#')]
+        self.assertEqual(effective, ['SUBSYSTEM=="gpu_class", KERNEL=="galcore", TAG+="seat", TAG+="uaccess"'])
+        self.assertLess('70-aesl-galcore.rules', '73-seat-late.rules')
+        self.assertNotRegex(rule, r'\b(?:MODE|GROUP|OWNER|RUN)\s*[:+]?=')
+        self.assertIn('REQUIRED_DISTRO_FEATURES = "display-boot-splash wayland systemd"', recipe)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'etc/udev/rules.d').mkdir(parents=True)
+            for key, value in {'D': temp, 'WORKDIR': str(FILES), 'sysconfdir': '/etc'}.items():
+                body = body.replace('${' + key + '}', value)
+            subprocess.run(['sh', '-eu', '-c', body], check=True)
+            self.assertEqual((root / 'etc/udev/rules.d/70-aesl-galcore.rules').read_text(), rule)
+
     def test_actual_psplash_prepend_runs_and_preserves_default_package(self):
         append = (BSP / "recipes-core/psplash/psplash_%.bbappend").read_text()
         body = re.search(r"python do_compile:prepend\(\) \{\n(.*?)\n\}", append, re.S)[1]
