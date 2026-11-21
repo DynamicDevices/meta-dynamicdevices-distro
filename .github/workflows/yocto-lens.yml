@@ -55,6 +55,15 @@ jobs:
           "${RUNNER_TEMP}/display-splash-tests/bin/pip" install Pillow==12.1.1
           "${RUNNER_TEMP}/display-splash-tests/bin/python" -m unittest discover -s tests -v
 
+      - name: Check display filter with pinned U-Boot regex engine
+        run: |
+          source_dir="${RUNNER_TEMP}/uboot-display-slre"
+          mkdir -p "${source_dir}/lib" "${source_dir}/include"
+          pinned="https://raw.githubusercontent.com/foundriesio/u-boot/adbe53791d8f3cc2d7ecf2a3f308494d561def9e"
+          curl --fail --location --silent --show-error "${pinned}/lib/slre.c" -o "${source_dir}/lib/slre.c"
+          curl --fail --location --silent --show-error "${pinned}/include/slre.h" -o "${source_dir}/include/slre.h"
+          python3 meta-dynamicdevices-bsp/scripts/test-display-bootargs-slre.py --source "${source_dir}"
+
       - name: Run yocto-lens static scan
         working-directory: meta-dynamicdevices-bsp
         env:

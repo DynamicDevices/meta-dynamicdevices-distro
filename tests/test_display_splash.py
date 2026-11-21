@@ -186,6 +186,7 @@ class DisplaySplashTest(unittest.TestCase):
 
     def test_ota_boot_policy_preserves_non_vt_arguments_and_failure_is_safe(self):
         fragment = (BSP / "recipes-bsp/u-boot/u-boot-ostree-scr-fit/display-bootargs.cmd").read_text()
+        self.assertIn('"^console=tty[0123456789]+$"', fragment)
         # Exercise the actual fragment with setexpr's U-Boot 2024.04 no-match
         # return code (1), not sed's always-success status.
         shim = r'''
