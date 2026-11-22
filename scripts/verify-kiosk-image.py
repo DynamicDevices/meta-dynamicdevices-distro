@@ -73,9 +73,9 @@ def verify_compressed(path, opener, label):
         raise ValueError(f'{label} failed integrity check: {exc}') from exc
 
 
-def verify_artifact_launcher(deployment, entry):
-    """Resolve the launcher inside its deployment, never against the host root."""
-    pending = ['usr', 'bin', 'jaguar-touch-test']
+def resolve_artifact_file(deployment, filename, entry, executable=False):
+    """Resolve a regular file inside its deployment, never against the host root."""
+    pending = filename.lstrip('/').split('/')
     resolved = []
     links = 0
     while pending:
@@ -84,32 +84,50 @@ def verify_artifact_launcher(deployment, entry):
             continue
         if component == '..':
             if not resolved:
-                raise ValueError('OTA touch launcher symlink escapes its deployment')
+                raise ValueError(f'OTA file symlink escapes its deployment: {filename}')
             resolved.pop()
             continue
         name = '/'.join([deployment.rstrip('/'), *resolved, component])
         metadata = entry(name)
         if metadata is None:
-            raise ValueError(f'OTA touch launcher has a missing path or symlink target: {name}')
+            raise ValueError(f'OTA file has a missing path or symlink target: {name}')
         kind, mode, target = metadata
         if kind == 'symlink':
             links += 1
             # Linux pathname resolution permits at most 40 symlink traversals.
             if links > 40 or not target:
-                raise ValueError('OTA touch launcher has a cyclic or invalid symlink')
+                raise ValueError(f'OTA file has a cyclic or invalid symlink: {filename}')
             if target.startswith('/'):
                 resolved = []
             pending = target.split('/') + pending
         elif kind == 'directory':
             resolved.append(component)
-        elif kind == 'regular' and not pending and mode & 0o111:
-            return
+        elif kind == 'regular' and not pending and (not executable or mode & 0o111):
+            return name
         else:
-            raise ValueError(f'OTA touch launcher is not a regular executable: {name}')
-    raise ValueError('OTA touch launcher resolves to a directory, not a regular executable')
+            raise ValueError(f'OTA file is not a regular {"executable" if executable else "file"}: {name}')
+    raise ValueError(f'OTA file resolves to a directory: {filename}')
 
 
-def verify_ota_ext4(path):
+def verify_artifact_payload(deployment, entry, read, expected_url):
+    resolved = {}
+    for name in ARTIFACT_FILES:
+        resolved[name] = resolve_artifact_file(
+            deployment, name, entry, executable=name == '/usr/bin/jaguar-touch-test')
+    units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
+             '/lib/systemd/system/dd-kiosk-browser.service')
+    for unit in units:
+        try:
+            resolve_artifact_file(deployment, unit, entry)
+            break
+        except ValueError:
+            continue
+    else:
+        raise ValueError(f'OTA deployment {deployment} missing valid dd-kiosk-browser.service')
+    verify_startup_environment(read(resolved['/etc/default/dd-kiosk-browser']), expected_url)
+
+
+def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
     """Inspect the shipped filesystem, not only BitBake's staging rootfs."""
     if shutil.which('debugfs') is None:
         raise ValueError('debugfs is required to inspect the OTA ext4 artifact')
@@ -127,13 +145,17 @@ def verify_ota_ext4(path):
         return [fields[5] for line in result.stdout.splitlines()
                 if len(fields := line.split('/')) > 5 and fields[5] not in ('.', '..')]
 
-    def has_file(image, name):
-        result = debugfs(image, f'stat {name}')
-        return result.returncode == 0 and 'Inode:' in result.stdout
+    def quote(name):
+        return '"' + name.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+    def read(image, name):
+        contents = debugfs(image, f'cat {quote(name)}')
+        if contents.returncode or contents.stderr.strip().splitlines()[1:]:
+            raise ValueError(f'cannot read OTA file: {name}')
+        return contents.stdout
 
     def entry(image, name):
-        quoted = '"' + name.replace('\\', '\\\\').replace('"', '\\"') + '"'
-        result = debugfs(image, f'stat {quoted}')
+        result = debugfs(image, f'stat {quote(name)}')
         match = re.search(r'Type:\s+(\S+)\s+Mode:\s+([0-7]+)', result.stdout)
         if result.returncode or match is None:
             return None
@@ -144,10 +166,7 @@ def verify_ota_ext4(path):
             if fast:
                 target = fast[1]
             else:
-                contents = debugfs(image, f'cat {quoted}')
-                if contents.returncode or contents.stderr.strip().splitlines()[1:]:
-                    raise ValueError(f'cannot read OTA touch launcher symlink: {name}')
-                target = contents.stdout
+                target = read(image, name)
         return kind, int(mode, 8), target
 
     with tempfile.TemporaryDirectory(prefix='dd-kiosk-ext4-') as directory:
@@ -162,29 +181,18 @@ def verify_ota_ext4(path):
                     deployments.append(f'{deploy_dir}/{checkout}')
         if not deployments:
             raise ValueError('OTA ext4 has no OSTree deployment checkout')
-        units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
-                 '/lib/systemd/system/dd-kiosk-browser.service')
         for deployment in deployments:
-            missing = [name for name in ARTIFACT_FILES if not has_file(image, deployment + name)]
-            if not any(has_file(image, deployment + name) for name in units):
-                missing.append('dd-kiosk-browser.service')
-            if missing:
-                raise ValueError(f'OTA ext4 deployment {deployment} missing {missing}')
-            verify_artifact_launcher(deployment, lambda name: entry(image, name))
+            verify_artifact_payload(deployment, lambda name: entry(image, name),
+                                    lambda name: read(image, name), expected_url)
     print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
     return {deployment.lstrip('/') for deployment in deployments}
 
 
-def verify_ota_tar(path, deployments):
+def verify_ota_tar(path, deployments, expected_url=JAGUAR_START_URL):
     """Check the separate OTA tar ships the same named deployment payload."""
-    required = {f'{deployment}{name}' for deployment in deployments
-                for name in ARTIFACT_FILES}
-    units = {deployment: {f'{deployment}/usr/lib/systemd/system/dd-kiosk-browser.service',
-                          f'{deployment}/lib/systemd/system/dd-kiosk-browser.service'}
-             for deployment in deployments}
-    found = set()
     metadata = {}
-    with tarfile.open(path, mode='r|xz') as archive:
+    members = {}
+    with tarfile.open(path, mode='r:xz') as archive:
         for member in archive:
             name = member.name[2:] if member.name.startswith('./') else member.name
             name = name.rstrip('/')
@@ -195,22 +203,18 @@ def verify_ota_tar(path, deployments):
                 if name in metadata:
                     raise ValueError(f'OTA tar contains duplicate deployment path: {name}')
                 metadata[name] = (kind, member.mode, member.linkname)
-            if not (member.isfile() or member.issym()):
-                continue
-            if name in required or any(name in variants for variants in units.values()):
-                found.add(name)
-    missing = sorted(required - found)
-    for deployment, variants in units.items():
-        if not variants & found:
-            missing.append(f'{deployment}/dd-kiosk-browser.service')
-    if missing:
-        raise ValueError(f'OTA tar missing kiosk payload: {missing}')
-    # Tar permits omitted directory headers; children imply those directories.
-    for name in list(metadata):
-        for parent in pathlib.PurePosixPath(name).parents:
-            metadata.setdefault(str(parent), ('directory', 0o755, None))
-    for deployment in deployments:
-        verify_artifact_launcher(deployment, metadata.get)
+                members[name] = member
+        # Tar permits omitted directory headers; children imply those directories.
+        for name in list(metadata):
+            for parent in pathlib.PurePosixPath(name).parents:
+                metadata.setdefault(str(parent), ('directory', 0o755, None))
+
+        def read(name):
+            with archive.extractfile(members[name]) as contents:
+                return contents.read().decode('utf-8')
+
+        for deployment in deployments:
+            verify_artifact_payload(deployment, metadata.get, read, expected_url)
     print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
@@ -285,15 +289,25 @@ def verify_etnaviv_weston(rootfs):
 
 def verify_startup_url(rootfs, expected_url):
     environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
-    configured = None
+    verify_startup_environment(environment, expected_url)
+
+
+def verify_startup_environment(environment, expected_url):
+    expected = {'DD_KIOSK_URL': expected_url, 'DD_KIOSK_MUTE_AUDIO': '1',
+                'DD_KIOSK_GLES2_COMPAT': '1'}
+    configured = {}
     for line in environment.splitlines():
-        if line.startswith('DD_KIOSK_URL='):
-            parts = shlex.split(line.partition('=')[2], comments=False)
+        key, separator, value = line.strip().partition('=')
+        if separator and key in expected:
+            parts = shlex.split(value, comments=False)
             if len(parts) != 1:
-                raise ValueError('rootfs kiosk URL is missing or malformed')
-            configured = parts[0]
-    if configured != expected_url:
-        raise ValueError(f'rootfs kiosk URL differs from expected URL: {expected_url}')
+                raise ValueError(f'kiosk environment {key} is missing or malformed')
+            configured[key] = parts[0]
+    if configured.get('DD_KIOSK_URL') != expected_url:
+        raise ValueError(f'kiosk URL differs from expected URL: {expected_url}')
+    for key, value in expected.items():
+        if configured.get(key) != value:
+            raise ValueError(f'kiosk environment requires {key}={value}')
 
 
 def verify_jaguar_touch(rootfs):
@@ -437,8 +451,8 @@ def main():
         except ValueError as exc:
             p.error(str(exc))
     try:
-        deployments = verify_ota_ext4(args.ota_ext4_gz)
-        verify_ota_tar(args.ota_tar_xz, deployments)
+        deployments = verify_ota_ext4(args.ota_ext4_gz, args.expected_url)
+        verify_ota_tar(args.ota_tar_xz, deployments, args.expected_url)
         verify_wic_partitions(args.candidate_wic_gz, args.ota_ext4_gz)
     except (ValueError, OSError, tarfile.TarError) as exc:
         p.error(str(exc))

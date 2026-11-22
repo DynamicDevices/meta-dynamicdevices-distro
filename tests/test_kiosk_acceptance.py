@@ -1,6 +1,8 @@
 """Check the image acceptance contract with controlled filesystem fixtures."""
 import importlib.util
 import gzip
+import contextlib
+import io
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,6 +17,13 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class KioskAcceptanceTests(unittest.TestCase):
+    DEPLOYMENTS = {'ostree/deploy/test/deploy/good.0',
+                   'ostree/deploy/test/deploy/candidate.1'}
+
+    def environment(self, url=VERIFY.JAGUAR_START_URL):
+        return (f'DD_KIOSK_URL="{url}"\nDD_KIOSK_MUTE_AUDIO=1\n'
+                'DD_KIOSK_GLES2_COMPAT=1\n')
+
     def make_deployment(self, root, deployment, case):
         checkout = root / deployment
         for name in (*VERIFY.ARTIFACT_FILES,
@@ -22,6 +31,7 @@ class KioskAcceptanceTests(unittest.TestCase):
             path = checkout / name.lstrip('/')
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('fixture')
+        (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
         launcher = checkout / 'usr/bin/jaguar-touch-test'
         launcher.chmod(0o755)
         if case == 'regular':
@@ -54,9 +64,23 @@ class KioskAcceptanceTests(unittest.TestCase):
                 target.rename(checkout / 'usr/libexec' / ('long-' * 20))
             launcher.symlink_to(link)
 
+    def check_artifact(self, root, directory, artifact, expected_url=VERIFY.JAGUAR_START_URL):
+        path = Path(directory) / ('ota.tar.xz' if artifact == 'tar' else 'ota.ext4.gz')
+        with contextlib.redirect_stdout(io.StringIO()):
+            if artifact == 'tar':
+                with tarfile.open(path, 'w:xz') as archive:
+                    archive.add(root, arcname='.')
+                return VERIFY.verify_ota_tar(path, self.DEPLOYMENTS, expected_url)
+            image = Path(directory) / 'ota.ext4'
+            with image.open('wb') as output:
+                output.truncate(16 * 1024 * 1024)
+            subprocess.run(['mkfs.ext4', '-q', '-F', '-d', str(root), str(image)],
+                           check=True, capture_output=True)
+            with image.open('rb') as source, gzip.open(path, 'wb') as output:
+                shutil.copyfileobj(source, output)
+            return VERIFY.verify_ota_ext4(path, expected_url)
+
     def test_shipped_tar_and_ext4_require_executable_touch_launcher(self):
-        deployments = {'ostree/deploy/test/deploy/good.0',
-                       'ostree/deploy/test/deploy/candidate.1'}
         for case in ('regular', 'relative', 'absolute', 'long', 'directory',
                      'non-executable', 'broken', 'cycle', 'escape',
                      'symlink-non-executable', 'symlink-directory'):
@@ -65,27 +89,68 @@ class KioskAcceptanceTests(unittest.TestCase):
                     root = Path(directory) / 'root'
                     self.make_deployment(root, 'ostree/deploy/test/deploy/good.0', 'regular')
                     self.make_deployment(root, 'ostree/deploy/test/deploy/candidate.1', case)
-                    path = Path(directory) / ('ota.tar.xz' if artifact == 'tar' else 'ota.ext4.gz')
-                    if artifact == 'tar':
-                        with tarfile.open(path, 'w:xz') as archive:
-                            archive.add(root, arcname='.')
-                        check = lambda: VERIFY.verify_ota_tar(path, deployments)
-                    else:
-                        image = Path(directory) / 'ota.ext4'
-                        with image.open('wb') as output:
-                            output.truncate(16 * 1024 * 1024)
-                        subprocess.run(['mkfs.ext4', '-q', '-F', '-d', str(root), str(image)],
-                                       check=True, capture_output=True)
-                        with image.open('rb') as source, gzip.open(path, 'wb') as output:
-                            shutil.copyfileobj(source, output)
-                        check = lambda: VERIFY.verify_ota_ext4(path)
+                    check = lambda: self.check_artifact(root, directory, artifact)
                     if case in ('regular', 'relative', 'absolute', 'long'):
                         result = check()
                         if artifact == 'ext4':
-                            self.assertEqual(result, deployments)
+                            self.assertEqual(result, self.DEPLOYMENTS)
                     else:
                         with self.assertRaises(ValueError):
                             check()
+
+    def test_shipped_touch_rule_and_page_must_resolve_to_regular_files(self):
+        for name in VERIFY.JAGUAR_TOUCH_FILES[:2]:
+            for kind in ('directory', 'broken-link', 'valid-link'):
+                for artifact in ('tar', 'ext4'):
+                    with self.subTest(name=name, kind=kind, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory) / 'root'
+                        for deployment in self.DEPLOYMENTS:
+                            self.make_deployment(root, deployment, 'regular')
+                        path = root / 'ostree/deploy/test/deploy/candidate.1' / name.lstrip('/')
+                        path.unlink()
+                        if kind == 'directory':
+                            path.mkdir()
+                        elif kind == 'broken-link':
+                            path.symlink_to('missing')
+                        else:
+                            path.with_name('actual-payload').write_text('fixture')
+                            path.symlink_to('actual-payload')
+                        if kind == 'valid-link':
+                            self.check_artifact(root, directory, artifact)
+                        else:
+                            with self.assertRaises(ValueError):
+                                self.check_artifact(root, directory, artifact)
+
+    def test_shipped_environment_content_in_every_deployment(self):
+        custom = 'https://example.com/start?a=1&b=2'
+        cases = {
+            'youtube': (self.environment(), VERIFY.JAGUAR_START_URL, True),
+            'custom': (self.environment(custom), custom, True),
+            'stale-url': (self.environment('https://active-esl.com'), VERIFY.JAGUAR_START_URL, False),
+            'wrong-custom-url': (self.environment(), custom, False),
+            'unmuted': (self.environment().replace('MUTE_AUDIO=1', 'MUTE_AUDIO=0'), VERIFY.JAGUAR_START_URL, False),
+            'no-gles2': (self.environment().replace('GLES2_COMPAT=1', 'GLES2_COMPAT=0'), VERIFY.JAGUAR_START_URL, False),
+            'missing-gles2': (self.environment().replace('DD_KIOSK_GLES2_COMPAT=1\n', ''), VERIFY.JAGUAR_START_URL, False),
+            'last-assignment': (self.environment() + 'DD_KIOSK_URL=https://stale.example.com\n', VERIFY.JAGUAR_START_URL, False),
+            'valid-symlink': (self.environment(), VERIFY.JAGUAR_START_URL, True),
+        }
+        for case, (content, expected, valid) in cases.items():
+            for artifact in ('tar', 'ext4'):
+                with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory) / 'root'
+                    for deployment in self.DEPLOYMENTS:
+                        self.make_deployment(root, deployment, 'regular')
+                        (root / deployment / 'etc/default/dd-kiosk-browser').write_text(self.environment(expected))
+                    config = root / 'ostree/deploy/test/deploy/candidate.1/etc/default/dd-kiosk-browser'
+                    config.write_text(content)
+                    if case == 'valid-symlink':
+                        config.rename(config.with_name('actual-environment'))
+                        config.symlink_to('/etc/default/actual-environment')
+                    if valid:
+                        self.check_artifact(root, directory, artifact, expected)
+                    else:
+                        with self.assertRaises(ValueError):
+                            self.check_artifact(root, directory, artifact, expected)
 
     def test_jaguar_and_custom_startup_urls(self):
         for url in (VERIFY.JAGUAR_START_URL, 'https://example.com/start?a=1&b=2'):
@@ -93,7 +158,7 @@ class KioskAcceptanceTests(unittest.TestCase):
                 root = Path(directory)
                 config = root / 'etc/default/dd-kiosk-browser'
                 config.parent.mkdir(parents=True)
-                config.write_text('DD_KIOSK_URL="' + url + '"\nDD_KIOSK_MUTE_AUDIO=1\n')
+                config.write_text(self.environment(url))
                 VERIFY.verify_startup_url(root, url)
                 with self.assertRaisesRegex(ValueError, 'differs from expected'):
                     VERIFY.verify_startup_url(root, 'https://wrong.example.com')

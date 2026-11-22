@@ -8,6 +8,7 @@ Launch `jaguar-touch-test --gestures` from the existing Weston user's session.
 Run local regression checks with:
 
 ```sh
+node scripts/test-jaguar-touch-test.mjs
 node recipes-graphics/jaguar-touch-test/test-jaguar-touch-test.cjs
 ```
 
