@@ -26,6 +26,9 @@ SYSTEMD_SERVICE:${PN} = "dd-kiosk-browser.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} = "chromium-ozone-wayland networkmanager-daemon"
+
+DD_KIOSK_GLES2_COMPAT ?= "0"
+DD_KIOSK_GLES2_COMPAT:imx8mm-jaguar-screen = "1"
 # The machine's ALSA recipe owns its default hardware routing configuration.
 RDEPENDS:${PN}:append:imx8mm-jaguar-screen = " alsa-state"
 
@@ -34,6 +37,7 @@ do_install() {
     install -m 0755 ${WORKDIR}/dd-kiosk-browser ${D}${bindir}/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.service ${D}${systemd_system_unitdir}/dd-kiosk-browser.service
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.env ${D}${sysconfdir}/default/dd-kiosk-browser
+    sed -i 's/^DD_KIOSK_GLES2_COMPAT=.*/DD_KIOSK_GLES2_COMPAT=${DD_KIOSK_GLES2_COMPAT}/' ${D}${sysconfdir}/default/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser
     install -m 0644 ${WORKDIR}/kiosk-policy.json ${D}${sysconfdir}/chromium/policies/managed/dd-kiosk-browser.json
