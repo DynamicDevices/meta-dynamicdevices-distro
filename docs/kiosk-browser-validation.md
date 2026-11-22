@@ -40,7 +40,8 @@ Before installation, back up and inspect the board's exact Weston configuration
 and drop-ins against the candidate; do not change the running G2D image to use
 GL libraries in place. After OTA, verify the effective command selects GL, the
 current invocation loads Mesa and the GL renderer, the kernel exposes Etnaviv,
-and the homepage is `https://active-esl.com`. Confirm actual rendering on the
+and Jaguar Screen opens its configured normal YouTube watch page with silent
+autoplay and single-video looping. Confirm actual rendering on the
 physical panel. An active DRM scanout, lit backlight, screenshot or running
 browser alone does not establish visible success. Keep rollback available.
 
@@ -73,12 +74,33 @@ a runtime fix for Chromium rendering under Vivante.
 
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
+The default expected URL is Jaguar Screen's silent autoplay/loop URL. Pass
+`--expected-url 'https://example.com/start'` for a deliberate startup override.
+The verifier also requires the shared touch rule, diagnostic page and executable
+touch launcher in the rootfs and shipped OSTree deployment payloads.
 It checks compressed-file integrity and SHA-256, package membership and size
 against active target 2945, plus the installed Chromium binary, service,
 policy, network hook, offline page, Weston kiosk shell, and panel transform.
 The rootfs check inspects BitBake's staging tree. The verifier also decompresses
 the OTA ext4 artifact and uses `debugfs` to confirm the kiosk files and service
 are present in every OSTree deployment checkout in the shipped filesystem.
+The same service-policy checks run on staging, tar and ext4: active systemd
+assignments, list resets, the final Chromium command, boot ordering, service
+identity, environment and restart policy. Comments do not count as settings.
+The verifier admits the shipped native-runtime, GLES2 and optional audio
+drop-ins; other kiosk overrides (including global, dash-prefix, generated,
+runtime or administrator units/drop-ins) fail closed until qualified. It does
+not claim to implement every systemd directive. Configured touch-test browser
+paths are escaped for both the installed shell launcher and sed replacement.
+Acceptance requires the exact Chromium policy key set and JSON value types;
+extra allowlists cannot override the blocked URLs. Launcher checks reject GPU,
+sandbox and web-security disabling switches, including `--switch=value` forms,
+and require one unambiguous Wayland platform selection. Installed touch rules
+must retain FT5x06, DSI-1 and identity calibration, and the touch launcher must
+retain its local diagnostic URL and GLES2 default. Chromium builds retain the
+established 16-job limit for the approximately 65-GiB Foundries worker; live
+build diagnostics remain enabled. These checks do not constitute a new build
+or hardware acceptance run.
 It also checks the WIC boot FAT and compares the WIC root partition byte for
 byte with the verified OTA ext4. Inspect the actual boot files and
 test both installation paths before hardware acceptance.
@@ -125,7 +147,7 @@ a kiosk test result.
 | Boot | New deployment selected; Weston and `dd-kiosk-browser` active without restart loop | Pending |
 | Render | Fullscreen page fills the panel in the intended orientation; no browser chrome or dialogs | Pending |
 | Touch | Tap, scroll and any required text input work; public input cannot leave the kiosk page | Pending |
-| Audio | Chromium plays through the BSP-selected `tas2555audio` card in the selected ROM1 or SmartAmp mode; physical speaker sound follows play/pause/play without clipping | Pending |
+| Audio | Jaguar Screen starts muted for the button test. No sound is expected until deliberately unmuted; separate BSP/audio work must establish speaker playback and protection acceptance | Pending |
 | Network loss | Remote test URL may show a transient error, but the service stays recoverable | Pending |
 | Network return | NetworkManager dispatcher restarts Chromium and the configured URL loads | Pending |
 | Browser crash | Killing Chromium causes systemd restart without a restore prompt | Pending |
