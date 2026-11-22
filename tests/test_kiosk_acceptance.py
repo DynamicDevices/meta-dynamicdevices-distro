@@ -35,6 +35,13 @@ class KioskAcceptanceTests(unittest.TestCase):
             path.write_text('fixture')
             path.chmod(0o755 if name in VERIFY.ARTIFACT_EXECUTABLES else 0o644)
         (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
+        (checkout / 'usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf').write_text(
+            'ExecStart=\nExecStart=/usr/libexec/dd-screen-weston --config=/etc/xdg/weston/weston-screen.ini\n')
+        (checkout / 'etc/xdg/weston/weston-screen.ini').write_text('shell=kiosk-shell.so\ntransform=rotate-90\n')
+        for module in ('gl-renderer.so', 'kiosk-shell.so'):
+            path = checkout / 'usr/lib/libweston-13' / module
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('fixture')
         launcher = checkout / 'usr/bin/jaguar-touch-test'
         launcher.chmod(0o755)
         if case == 'regular':
@@ -166,6 +173,37 @@ class KioskAcceptanceTests(unittest.TestCase):
                 else:
                     with self.assertRaisesRegex(ValueError, 'deployments differ|duplicate deployment'):
                         VERIFY.verify_ota_tar(path, self.DEPLOYMENTS)
+
+    def test_display_boot_contract_is_shared_by_rootfs_tar_and_ext4(self):
+        cases = {
+            'missing-selector': ('usr/libexec/dd-screen-weston', 'remove'),
+            'non-executable-selector': ('usr/libexec/dd-screen-weston', 'chmod'),
+            'missing-renderer': ('usr/lib/libweston-13/gl-renderer.so', 'remove'),
+            'missing-shell': ('usr/lib/libweston-13/kiosk-shell.so', 'remove'),
+            'wrong-launch-command': ('usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf', 'wrong-command'),
+            'wrong-shell': ('etc/xdg/weston/weston-screen.ini', 'wrong-shell'),
+        }
+        for case, (name, action) in cases.items():
+            for artifact in ('rootfs', 'tar', 'ext4'):
+                with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory) / 'root'
+                    for deployment in self.DEPLOYMENTS:
+                        self.make_deployment(root, deployment, 'regular')
+                    checkout = root / 'ostree/deploy/test/deploy/candidate.1'
+                    path = checkout / name
+                    if action == 'remove':
+                        path.unlink()
+                    elif action == 'chmod':
+                        path.chmod(0o644)
+                    elif action == 'wrong-command':
+                        path.write_text(path.read_text().replace('/usr/libexec/dd-screen-weston ', '/usr/bin/weston '))
+                    else:
+                        path.write_text('shell=missing-shell.so\ntransform=rotate-90\n')
+                    with self.assertRaises(ValueError):
+                        if artifact == 'rootfs':
+                            VERIFY.verify_etnaviv_weston(checkout)
+                        else:
+                            self.check_artifact(root, directory, artifact)
 
     def test_rootfs_environment_links_are_contained(self):
         for kind in ('absolute-escape', 'relative-escape', 'parent-escape',

@@ -68,6 +68,7 @@ class EtnavivTests(unittest.TestCase):
         self.assertIn('shell=kiosk-shell.so', ini)
         self.assertIn('transform=rotate-90', ini)
         self.renderer('gl-renderer.so')
+        self.renderer('kiosk-shell.so')
         verifier.verify_etnaviv_weston(self.root)
 
     def test_capture_stays_development_only(self):
@@ -94,6 +95,7 @@ class EtnavivTests(unittest.TestCase):
             verifier.verify_etnaviv_weston(self.root)
         self.renderer('gl-renderer.so')
         original = vendor.read_text()
+        self.renderer('kiosk-shell.so')
         vendor.write_text(original.replace('--modules=', '--use-g2d --modules='))
         with self.assertRaisesRegex(ValueError, 'non-GL'):
             verifier.verify_etnaviv_weston(self.root)
@@ -142,6 +144,7 @@ class EtnavivTests(unittest.TestCase):
     def test_image_check_rejects_missing_display_selector(self):
         self.generate()
         self.renderer('gl-renderer.so')
+        self.renderer('kiosk-shell.so')
         (self.root / 'usr/libexec/dd-screen-weston').unlink()
         with self.assertRaisesRegex(ValueError, 'dynamic display selector'):
             verifier.verify_etnaviv_weston(self.root)

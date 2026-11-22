@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate one completed kiosk image against the deployed screen baseline."""
 import argparse
+import fnmatch
 import gzip
 import hashlib
 import json
@@ -34,6 +35,7 @@ ARTIFACT_FILES = JAGUAR_TOUCH_FILES + (
     '/usr/bin/chromium',
     '/usr/bin/dd-kiosk-browser',
     '/usr/libexec/dd-kiosk-linker-guard',
+    '/usr/libexec/dd-screen-weston',
     '/etc/default/dd-kiosk-browser',
     '/etc/chromium/policies/managed/dd-kiosk-browser.json',
     '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
@@ -49,8 +51,50 @@ ARTIFACT_EXECUTABLES = {
     '/usr/bin/chromium',
     '/usr/bin/dd-kiosk-browser',
     '/usr/libexec/dd-kiosk-linker-guard',
+    '/usr/libexec/dd-screen-weston',
     '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
 }
+DISPLAY_MODULES = {
+    'gl-renderer.so': ('/usr/lib*/libweston-*/gl-renderer.so',),
+    'kiosk-shell.so': ('/usr/lib*/weston*/kiosk-shell.so',
+                       '/usr/lib*/libweston-*/kiosk-shell.so'),
+}
+
+
+def display_matches(paths, patterns):
+    return [name for name in paths if any(
+        name.count('/') == pattern.count('/') and fnmatch.fnmatchcase(name, pattern)
+        for pattern in patterns)]
+
+
+def verify_display_payload(file, read, paths):
+    """The same Weston boot contract for staging, ext4 and tar deployments."""
+    try:
+        vendor = file('/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf')
+    except ValueError as exc:
+        raise ValueError('image lacks valid deployment-owned Etnaviv Weston override') from exc
+    command = read(vendor)
+    if '--use-g2d' in command or '--use-pixman' in command:
+        raise ValueError('image Etnaviv Weston override selects a non-GL renderer')
+    if 'ExecStart=\n' not in command or '--config=/etc/xdg/weston/weston-screen.ini' not in command:
+        raise ValueError('image Etnaviv Weston override lacks command reset or screen config')
+    for module, patterns in DISPLAY_MODULES.items():
+        matches = display_matches(paths, patterns)
+        if not matches:
+            raise ValueError(f'image Weston lacks {module}')
+        for name in matches:
+            file(name)
+    try:
+        file('/usr/libexec/dd-screen-weston', executable=True)
+    except ValueError as exc:
+        raise ValueError('image Etnaviv Weston lacks executable dynamic display selector') from exc
+    if 'ExecStart=/usr/libexec/dd-screen-weston ' not in command or '--drm-device=' in command:
+        raise ValueError('image Etnaviv Weston lacks executable dynamic display selector')
+    if display_matches(paths, ('/usr/lib*/libweston-*/g2d-renderer.so',)):
+        raise ValueError('image Etnaviv Weston includes the NXP G2D renderer')
+    weston = read(file('/etc/xdg/weston/weston-screen.ini'))
+    if 'shell=kiosk-shell.so' not in weston or 'transform=rotate-90' not in weston:
+        raise ValueError('image Weston config lacks kiosk shell or candidate panel transform')
 
 
 def packages(path):
@@ -117,7 +161,7 @@ def resolve_artifact_file(deployment, filename, entry, executable=False):
     raise ValueError(f'OTA file resolves to a directory: {filename}')
 
 
-def verify_artifact_payload(deployment, entry, read, expected_url):
+def verify_artifact_payload(deployment, entry, read, expected_url, paths):
     resolved = {}
     for name in ARTIFACT_FILES:
         resolved[name] = resolve_artifact_file(
@@ -133,6 +177,9 @@ def verify_artifact_payload(deployment, entry, read, expected_url):
     else:
         raise ValueError(f'OTA deployment {deployment} missing valid dd-kiosk-browser.service')
     verify_startup_environment(read(resolved['/etc/default/dd-kiosk-browser']), expected_url)
+    verify_display_payload(
+        lambda name, executable=False: resolve_artifact_file(deployment, name, entry, executable),
+        read, paths)
 
 
 def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
@@ -190,8 +237,21 @@ def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
         if not deployments:
             raise ValueError('OTA ext4 has no OSTree deployment checkout')
         for deployment in deployments:
+            paths = []
+            for library in entries(image, deployment + '/usr'):
+                library_path = deployment + '/usr/' + library
+                if not library.startswith('lib') or (entry(image, library_path) or (None,))[0] != 'directory':
+                    continue
+                for module_dir in entries(image, library_path):
+                    if not (module_dir.startswith('libweston-') or module_dir.startswith('weston')):
+                        continue
+                    module_path = library_path + '/' + module_dir
+                    if (entry(image, module_path) or (None,))[0] != 'directory':
+                        continue
+                    paths.extend('/usr/' + library + '/' + module_dir + '/' + name
+                                 for name in entries(image, module_path))
             verify_artifact_payload(deployment, lambda name: entry(image, name),
-                                    lambda name: read(image, name), expected_url)
+                                    lambda name: read(image, name), expected_url, paths)
     print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
     return {deployment.lstrip('/') for deployment in deployments}
 
@@ -235,7 +295,9 @@ def verify_ota_tar(path, deployments, expected_url=JAGUAR_START_URL):
                 return contents.read().decode('utf-8')
 
         for deployment in tar_deployments:
-            verify_artifact_payload(deployment, metadata.get, read, expected_url)
+            paths = [name[len(deployment):] for name in metadata
+                     if name.startswith(deployment + '/')]
+            verify_artifact_payload(deployment, metadata.get, read, expected_url, paths)
     print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
@@ -289,27 +351,12 @@ def verify_wic_partitions(wic_gz, ota_gz):
 
 def verify_etnaviv_weston(rootfs):
     """Reject stale G2D launchers and a missing GL runtime in the candidate."""
-    try:
-        vendor = rootfs_file(rootfs, '/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf')
-    except ValueError as exc:
-        raise ValueError('rootfs lacks valid deployment-owned Etnaviv Weston override') from exc
-    command = vendor.read_text()
-    if '--use-g2d' in command or '--use-pixman' in command:
-        raise ValueError('rootfs Etnaviv Weston override selects a non-GL renderer')
-    if 'ExecStart=\n' not in command or '--config=/etc/xdg/weston/weston-screen.ini' not in command:
-        raise ValueError('rootfs Etnaviv Weston override lacks command reset or screen config')
-    if not any(rootfs_file(rootfs, str(path.relative_to(rootfs)))
-               for path in rootfs.glob('usr/lib*/libweston-*/gl-renderer.so')):
-        raise ValueError('rootfs Etnaviv Weston lacks gl-renderer.so')
-    try:
-        rootfs_file(rootfs, '/usr/libexec/dd-screen-weston', executable=True)
-    except ValueError as exc:
-        raise ValueError('rootfs Etnaviv Weston lacks executable dynamic display selector') from exc
-    if ('ExecStart=/usr/libexec/dd-screen-weston ' not in command or
-            '--drm-device=' in command):
-        raise ValueError('rootfs Etnaviv Weston lacks executable dynamic display selector')
-    if any(rootfs.glob('usr/lib*/libweston-*/g2d-renderer.so')):
-        raise ValueError('rootfs Etnaviv Weston includes the NXP G2D renderer')
+    patterns = tuple(pattern for values in DISPLAY_MODULES.values() for pattern in values)
+    patterns += ('/usr/lib*/libweston-*/g2d-renderer.so',)
+    paths = ['/' + str(path.relative_to(rootfs)) for pattern in patterns
+             for path in rootfs.glob(pattern.lstrip('/'))]
+    verify_display_payload(lambda name, executable=False: rootfs_file(rootfs, name, executable),
+                           lambda path: path.read_text(), paths)
 
 
 def verify_startup_url(rootfs, expected_url):
@@ -428,9 +475,6 @@ def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     weston_service = rootfs_file(rootfs, '/etc/systemd/system/weston.service.d/screen.conf').read_text()
     if '--config=/etc/xdg/weston/weston-screen.ini' not in weston_service:
         raise ValueError('rootfs Weston service does not select candidate screen config')
-    if not any(rootfs_file(rootfs, str(path.relative_to(rootfs)))
-               for path in rootfs.rglob('kiosk-shell.so')):
-        raise ValueError('rootfs lacks Weston kiosk-shell.so module')
     policy_path = rootfs_file(rootfs, '/etc/chromium/policies/managed/dd-kiosk-browser.json')
     policy = json.loads(policy_path.read_text())
     expected_policy = {

@@ -131,6 +131,7 @@ const history = [];
 const counters = {touchstart:0,touchmove:0,touchend:0,touchcancel:0,
                   pointerdown:0,pointermove:0,pointerup:0,pointercancel:0};
 let width = 0, height = 0, maximum = 0, nativeSeen = false;
+let compatibilitySerial = 0;
 let mode = new URLSearchParams(location.search).get('mode') === 'gestures' ? 'gestures' : 'contacts';
 const trailVisibility = {contacts:true, gestures:false};
 const view = {scale:1, x:0, y:0};
@@ -260,6 +261,12 @@ function onTouch(event) {
         touches.has(contact.identifier) || !(contact.target || event.target).closest?.('button,nav'));
     if (!touches.size && !contacts.length) return;
     if (!event.target.closest?.('button,nav')) event.preventDefault();
+    if (!nativeSeen) {
+        const compatibilityIds = new Set(Array.from(pointers.values(), point => point.compatibilityId)
+            .filter(id => id !== undefined));
+        const retained = history.filter(point => !compatibilityIds.has(point.compatibilityId));
+        history.splice(0, history.length, ...retained);
+    }
     nativeSeen = true;
     counters[event.type]++;
     const next = new Map();
@@ -290,6 +297,7 @@ function onPointer(event) {
     let point = pointers.get(event.pointerId);
     if (event.type === 'pointerdown') {
         point = newPoint(pointers);
+        if (event.pointerType === 'touch') point.compatibilityId = ++compatibilitySerial;
         pointers.set(event.pointerId, point);
         if (!nativeSeen) maximum = Math.max(maximum, pointers.size);
     }
