@@ -13,11 +13,46 @@ DD_PRODUCT_FEATURES ?= "${@bb.utils.contains('MACHINE_FEATURES', 'display-multim
 # A headed product uses the common boot/desktop artwork unless opted out.
 DD_DISPLAY_BOOT_SPLASH ?= "1"
 
+# The kiosk manifest carries its own pinned Chromium and Rust-mixin layers.
+# Limit their provider choices to kiosk builds so this shared distro contract
+# does not alter any existing product's toolchain or recipe selection.  The
+# graphics backend is selected independently of the browser. Chromium kiosks,
+# including the Screen, use matching Mesa/Etnaviv EGL/GBM/GLES providers and
+# Weston's GL renderer. Do not select Vivante merely to satisfy a stale launcher.
+DD_KIOSK_GRAPHICS_BACKEND ?= "etnaviv"
+DD_KIOSK_GRAPHICS_BACKEND:imx8mm-jaguar-screen = "etnaviv"
+OVERRIDES:append = "${@':ddkioskbrowser:dd-graphics-' + d.getVar('DD_KIOSK_GRAPHICS_BACKEND') if 'kiosk-browser' in (d.getVar('DD_PRODUCT_FEATURES') or '').split() else ''}"
+RUSTVERSION:ddkioskbrowser = "1.98.1"
+PREFERRED_VERSION_nativesdk-cargo:ddkioskbrowser = "${RUSTVERSION}"
+PREFERRED_VERSION_nativesdk-libstd-rs:ddkioskbrowser = "${RUSTVERSION}"
+PREFERRED_VERSION_nativesdk-rust:ddkioskbrowser = "${RUSTVERSION}"
+PREFERRED_VERSION_nativesdk-rust-llvm:ddkioskbrowser = "${RUSTVERSION}"
+PREFERRED_VERSION_rust-cross-canadian-aarch64:ddkioskbrowser = "${RUSTVERSION}"
+PREFERRED_VERSION_nodejs:ddkioskbrowser = "22.11.0"
+PREFERRED_VERSION_nodejs-native:ddkioskbrowser = "22.11.0"
+PREFERRED_VERSION_nodejs-oe-cache-native:ddkioskbrowser = "22.11"
+PREFERRED_VERSION_librsvg:ddkioskbrowser = "2.62.3"
+PREFERRED_VERSION_librsvg-native:ddkioskbrowser = "2.62.3"
+PREFERRED_VERSION_nativesdk-librsvg:ddkioskbrowser = "2.62.3"
+PREFERRED_VERSION_libgit2:ddkioskbrowser = "1.9.7"
+PREFERRED_VERSION_libgit2-native:ddkioskbrowser = "1.9.7"
+PREFERRED_VERSION_gn-native:ddkioskbrowser = "147.0.7727.116"
+PREFERRED_VERSION_cargo-c-native:ddkioskbrowser = "0.10.25+cargo-0.99.0"
+
+# The LmP 94 Clang toolchain exposes a g-ir-scanner parser failure when the
+# NXP GStreamer 1.26 recipes consume GLib's G_PASTE/__COUNTER__ assertions.
+# The kiosk has no GIR/Python consumer, so omit only the affected generated
+# introspection data while retaining the normal GStreamer runtime libraries.
+GI_DATA_ENABLED:pn-gstreamer1.0:ddkioskbrowser = "False"
+GI_DATA_ENABLED:pn-gstreamer1.0-plugins-base:ddkioskbrowser = "False"
+GI_DATA_ENABLED:pn-gstreamer1.0-plugins-bad:ddkioskbrowser = "False"
+
 DD_PRODUCT_FEATURES_VALID = " \
     alsa \
     android-container \
     audio \
     auto-register \
+    kiosk-browser \
     cra-audit \
     display \
     flutter \
@@ -33,7 +68,7 @@ DD_PRODUCT_FEATURES_VALID = " \
 DISTRO_FEATURES:remove = " \
     zeroconf x11 directfb \
     ${@'' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else 'vulkan'} \
-    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container'} else 'wayland opengl'} \
+    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container', 'kiosk-browser'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'android-container'} else 'alsa'} \
 "
@@ -49,6 +84,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-browser', 'display-runtime kiosk-browser wayland opengl etnaviv', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid apparmor wayland opengl vulkan pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'cra-audit', 'cra-audit', '', d)} \
@@ -61,6 +97,10 @@ dd_validate_product_features[eventmask] = "bb.event.ConfigParsed"
 
 python dd_validate_product_features() {
     selected = set((e.data.getVar("DD_PRODUCT_FEATURES") or "").split())
+    if "kiosk-browser" in selected:
+        backend = e.data.getVar("DD_KIOSK_GRAPHICS_BACKEND")
+        if backend not in {"etnaviv", "imxg2d"}:
+            bb.fatal("Unknown DD_KIOSK_GRAPHICS_BACKEND: %s" % backend)
     valid = set((e.data.getVar("DD_PRODUCT_FEATURES_VALID") or "").split())
     unknown = sorted(selected - valid)
     if unknown:
@@ -69,7 +109,14 @@ python dd_validate_product_features() {
             % (" ".join(unknown), " ".join(sorted(valid)))
         )
 
-    display_software = selected & {"display", "flutter", "godot"}
+    other_display_apps = selected & {"flutter", "godot", "android-container"}
+    if "kiosk-browser" in selected and other_display_apps:
+        bb.fatal(
+            "kiosk-browser owns the display and cannot be combined with %s"
+            % " ".join(sorted(other_display_apps))
+        )
+
+    display_software = selected & {"display", "flutter", "godot", "kiosk-browser"}
     machine_features = set((e.data.getVar("MACHINE_FEATURES") or "").split())
     if display_software and "display-multimedia" not in machine_features:
         bb.fatal(
@@ -78,3 +125,18 @@ python dd_validate_product_features() {
             % " ".join(sorted(display_software))
         )
 }
+
+# Never enable the Etnaviv kernel/userspace path alongside NXP G2D. With the
+# Etnaviv overrides inactive, the machine's original Vivante providers apply.
+DISTRO_FEATURES:remove:dd-graphics-imxg2d = "etnaviv"
+
+# Mesa must own the complete userspace graphics API set for Etnaviv.  These
+# preferences override the i.MX machine's proprietary imxgpu provider defaults
+# only when the product-specific dd-graphics-etnaviv override is active.
+PREFERRED_PROVIDER_virtual/egl:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgbm:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgl:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/mesa:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles1:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles2:dd-graphics-etnaviv = "mesa-gl"
+PREFERRED_PROVIDER_virtual/libgles3:dd-graphics-etnaviv = "mesa-gl"

@@ -213,6 +213,7 @@ PACKAGECONFIG:append:mx95-nxp-bsp = " kms"
 PACKAGECONFIG:append = " ${PACKAGECONFIG_G2D}"
 PACKAGECONFIG_G2D          ??= ""
 PACKAGECONFIG_G2D:imxgpu2d ??= "g2d"
+PACKAGECONFIG_G2D:dd-graphics-etnaviv = ""
 
 PACKAGECONFIG[g2d] = ",,virtual/libg2d"
 PACKAGECONFIG[tinycompress]    = "-Dtinycompress=enabled,-Dtinycompress=disabled,tinycompress"

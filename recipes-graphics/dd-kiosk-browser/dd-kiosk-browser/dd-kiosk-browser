@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+url=${DD_KIOSK_URL:-file:///usr/share/dd-kiosk-browser/offline.html}
+state_dir=${STATE_DIRECTORY:-/var/lib/dd-kiosk-browser}
+runtime_dir=/run/user/$(id -u)
+
+# Board provisioning may require silent unattended startup. Keep this explicit
+# rather than inheriting test-launcher overrides or changing mixer/driver state.
+case "${DD_KIOSK_MUTE_AUDIO:-0}" in
+    0) set -- ;;
+    1) set -- --mute-audio ;;
+    *) echo "DD_KIOSK_MUTE_AUDIO must be 0 or 1" >&2; exit 1 ;;
+esac
+
+# GC600 supports ES2. Chromium 147 otherwise rejects its context and disables
+# hardware compositing. Only the Screen Etnaviv image opts into this fallback;
+# keep the sandbox and GPU driver workarounds unchanged.
+case "${DD_KIOSK_GLES2_COMPAT:-0}" in
+    0) ;;
+    1) set -- "$@" --disable-features=FallbackToSWIfGLES3NotSupported ;;
+    *) echo "DD_KIOSK_GLES2_COMPAT must be 0 or 1" >&2; exit 1 ;;
+esac
+
+case "$url" in
+    http://*) location=${url#http://} ;;
+    https://*) location=${url#https://} ;;
+    file:///*) location=${url#file://} ;;
+    *) echo "DD_KIOSK_URL must be an HTTP(S) or absolute file URL" >&2; exit 1 ;;
+esac
+
+case "$url" in
+    http://*|https://*)
+        authority=${location%%[/?#]*}
+        case "$authority" in
+            ''|:*|*[[:space:]]*) echo "DD_KIOSK_URL must name an HTTP(S) host" >&2; exit 1 ;;
+        esac
+        ;;
+esac
+
+# Weston creates the Wayland socket. Fail cleanly so systemd can restart us
+# if the compositor is still coming up or has restarted.
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    for socket in "$runtime_dir"/wayland-*; do
+        [ -S "$socket" ] || continue
+        export XDG_RUNTIME_DIR="$runtime_dir"
+        export WAYLAND_DISPLAY="${socket##*/}"
+        export LC_ALL=C
+        # shellcheck disable=SC2093
+        exec /usr/bin/chromium "$@" --ozone-platform=wayland --kiosk \
+            --no-first-run --no-default-browser-check \
+            --hide-crash-restore-bubble \
+            --user-data-dir="$state_dir/profile" "$url"
+    done
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+echo "No Weston Wayland socket became available for the weston user" >&2
+exit 1

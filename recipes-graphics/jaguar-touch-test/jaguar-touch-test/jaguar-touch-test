@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+# Run in the existing weston user's desktop session. The normal kiosk launcher
+# discovers its Wayland socket and retains the configured browser runtime.
+case "${1:-}" in
+    '') suffix= ;;
+    --gestures) suffix='?mode=gestures' ;;
+    *) echo "Usage: jaguar-touch-test [--gestures]" >&2; exit 2 ;;
+esac
+export DD_KIOSK_URL="file:///usr/share/jaguar-touch-test/index.html$suffix"
+# This package is Jaguar-only. Match the board's service default even when
+# launched directly, while retaining an explicit caller override.
+export DD_KIOSK_GLES2_COMPAT="${DD_KIOSK_GLES2_COMPAT:-1}"
+# The recipe substitutes the selected runtime's launcher as the default;
+# callers may explicitly override it without changing calibration or startup.
+exec "${DD_KIOSK_TEST_BROWSER:-/usr/bin/dd-kiosk-browser}"

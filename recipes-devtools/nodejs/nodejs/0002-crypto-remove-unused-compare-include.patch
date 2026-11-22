@@ -1,0 +1,16 @@
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Subject: [PATCH] crypto: remove unused compare include
+
+crypto_random.cc does not use declarations from <compare>. Removing the
+unused include lets Node's native tools build with Clang against the older
+host libstdc++ supplied by the Foundries worker, which has no <compare>
+header.
+
+Upstream-Status: Inappropriate [Foundries host libstdc++ compatibility]
+
+diff --git a/src/crypto/crypto_random.cc b/src/crypto/crypto_random.cc
+index f5e2ab1..c1ec173 100644
+--- a/src/crypto/crypto_random.cc
++++ b/src/crypto/crypto_random.cc
+@@ -12 +11,0 @@
+-#include <compare>

@@ -39,6 +39,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/imag
 # Enable Godot related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
 
+# Enable the browser kiosk only for products that select it.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'recipes-samples/images/lmp-feature-kiosk-browser.inc', '', d)}
+
 # Enable OP-TEE related recipes if provided by the image
 require ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'recipes-samples/images/lmp-feature-optee.inc', '', d)}
 
