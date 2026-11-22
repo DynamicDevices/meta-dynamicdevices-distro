@@ -36,10 +36,15 @@ class KioskAcceptanceTests(unittest.TestCase):
             path.chmod(0o755 if name in VERIFY.ARTIFACT_EXECUTABLES else 0o644)
         (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
         for name, settings in VERIFY.KIOSK_CONTENTS.items():
-            (checkout / name.lstrip('/')).write_text('\n'.join(settings) + '\n')
+            (checkout / name.lstrip('/')).write_text(
+                ('[Service]\n' if name.endswith('.conf') else '') + '\n'.join(settings) + '\n')
+        (checkout / 'usr/bin/dd-kiosk-browser').write_text(
+            'exec /usr/bin/chromium --ozone-platform=wayland --kiosk\n')
+        (checkout / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf').write_text(
+            (ROOT / 'recipes-graphics/dd-kiosk-browser/dd-kiosk-browser/dd-kiosk-native-runtime.conf').read_text())
         (checkout / 'etc/chromium/policies/managed/dd-kiosk-browser.json').write_text(json.dumps(VERIFY.CHROMIUM_POLICY))
         (checkout / 'usr/lib/systemd/system/dd-kiosk-browser.service').write_text(
-            'User=weston\nStateDirectory=dd-kiosk-browser\nRestart=always\nAfter=weston.service\n')
+            (ROOT / 'recipes-graphics/dd-kiosk-browser/dd-kiosk-browser/dd-kiosk-browser.service').read_text())
         enabled = checkout / VERIFY.KIOSK_ENABLEMENT.lstrip('/')
         enabled.unlink()
         enabled.symlink_to('/usr/lib/systemd/system/dd-kiosk-browser.service')
@@ -216,7 +221,14 @@ class KioskAcceptanceTests(unittest.TestCase):
     def test_kiosk_boot_and_policy_contract_in_all_image_views(self):
         for case in ('valid', 'missing-context', 'wrong-context', 'disabled',
                      'broken-link', 'regular-enablement', 'wrong-target',
-                     'wrong-unit-user', 'wrong-unit-restart', 'wrong-browser-policy', 'lib-unit'):
+                     'wrong-unit-user', 'wrong-unit-restart', 'wrong-browser-policy', 'lib-unit',
+                     'commented-user', 'later-user', 'missing-exec', 'wrong-exec',
+                     'duplicate-exec', 'commented-flags', 'wrong-group', 'wrong-groups',
+                     'wrong-state', 'wrong-envfile', 'wrong-order', 'wrong-target-unit',
+                     'dropin-user', 'global-dropin', 'prefix-dropin', 'runtime-dropin',
+                     'admin-unit', 'commented-context', 'later-context', 'reset-unset',
+                     'valid-audio', 'valid-reset', 'dropin-wrong-exec',
+                     'later-restart', 'unqualified-env', 'escaped-context'):
             for artifact in ('rootfs', 'tar', 'ext4'):
                 with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory) / 'root'
@@ -250,13 +262,68 @@ class KioskAcceptanceTests(unittest.TestCase):
                         unit.write_text(unit.read_text().replace('Restart=always', 'Restart=no'))
                     elif case == 'wrong-browser-policy':
                         (checkout / 'etc/chromium/policies/managed/dd-kiosk-browser.json').write_text('{}')
+                    elif case == 'commented-user':
+                        unit.write_text(unit.read_text().replace('User=weston', '#User=weston'))
+                    elif case == 'later-user':
+                        unit.write_text(unit.read_text() + '\n[Service]\nUser=root\n')
+                    elif case in ('missing-exec', 'wrong-exec', 'duplicate-exec'):
+                        command = 'ExecStart=/usr/bin/dd-kiosk-browser'
+                        replacement = {'missing-exec': '#' + command,
+                                       'wrong-exec': 'ExecStart=/bin/false',
+                                       'duplicate-exec': command + '\nExecStart=/bin/false'}[case]
+                        unit.write_text(unit.read_text().replace(command, replacement))
+                        runtime = context.with_name('zzzz-native-runtime.conf')
+                        runtime.write_text('[Service]\nUnsetEnvironment=LD_LIBRARY_PATH\n')
+                    elif case == 'commented-flags':
+                        (checkout / 'usr/bin/dd-kiosk-browser').write_text(
+                            '# --ozone-platform=wayland --kiosk\nexec /usr/bin/chromium\n')
+                    elif case.startswith('wrong-'):
+                        key, value = {'wrong-group': ('Group=weston', 'Group=root'),
+                                      'wrong-groups': ('SupplementaryGroups=render video', 'SupplementaryGroups=render'),
+                                      'wrong-state': ('StateDirectory=dd-kiosk-browser', '#StateDirectory=dd-kiosk-browser'),
+                                      'wrong-envfile': ('EnvironmentFile=-/etc/default/dd-kiosk-browser', 'EnvironmentFile=/tmp/kiosk'),
+                                      'wrong-order': ('After=weston.service', '#After=weston.service'),
+                                      'wrong-target-unit': ('WantedBy=multi-user.target', 'WantedBy=other.target')}[case]
+                        unit.write_text(unit.read_text().replace(key, value))
+                    elif case in ('dropin-user', 'global-dropin', 'prefix-dropin', 'runtime-dropin'):
+                        parent = {'dropin-user': 'etc/systemd/system/dd-kiosk-browser.service.d',
+                                  'global-dropin': 'usr/lib/systemd/system/service.d',
+                                  'prefix-dropin': 'usr/lib/systemd/system/dd-kiosk-.service.d',
+                                  'runtime-dropin': 'run/systemd/system/dd-kiosk-browser.service.d'}[case]
+                        override = checkout / parent / 'zzzzzzz-override.conf'
+                        override.parent.mkdir(parents=True, exist_ok=True)
+                        override.write_text('[Service]\nUser=root\n')
+                    elif case == 'admin-unit':
+                        override = checkout / 'etc/systemd/system/dd-kiosk-browser.service'
+                        override.write_text(unit.read_text().replace('User=weston', 'User=root'))
+                    elif case == 'commented-context':
+                        context.write_text('[Service]\n#Environment=DD_KIOSK_GLES2_COMPAT=1\n')
+                    elif case == 'later-context':
+                        context.write_text('[Service]\nEnvironment=DD_KIOSK_GLES2_COMPAT=1\nEnvironment=DD_KIOSK_GLES2_COMPAT=0\n')
+                    elif case == 'reset-unset':
+                        runtime = context.with_name('zzzz-native-runtime.conf')
+                        runtime.write_text('[Service]\nUnsetEnvironment=LD_LIBRARY_PATH\nUnsetEnvironment=\n')
+                    elif case == 'valid-audio':
+                        for name in ('audio', 'screen-audio'):
+                            context.with_name(name + '.conf').write_text(
+                                (ROOT / ('recipes-graphics/dd-kiosk-browser/dd-kiosk-browser/dd-kiosk-browser-' + name + '.conf')).read_text())
+                    elif case == 'valid-reset':
+                        context.write_text('[Service]\nEnvironment=DD_KIOSK_GLES2_COMPAT=0\nEnvironment=\nEnvironment=DD_KIOSK_GLES2_COMPAT=1\n')
+                    elif case == 'dropin-wrong-exec':
+                        context.write_text(context.read_text() + 'ExecStart=\nExecStart=/bin/false\n')
+                    elif case == 'later-restart':
+                        unit.write_text(unit.read_text() + '\n[Service]\nRestart=no\n')
+                    elif case == 'unqualified-env':
+                        context.write_text(context.read_text() + 'Environment=LD_PRELOAD=/tmp/inject.so\n')
+                    elif case == 'escaped-context':
+                        context.write_text(context.read_text() + 'Environment=DD_KIOSK_GLES2_COMPAT=\\1\n')
                     def check():
                         if artifact == 'rootfs':
                             with contextlib.redirect_stdout(io.StringIO()):
                                 VERIFY.verify_rootfs(checkout)
                         else:
                             self.check_artifact(root, directory, artifact)
-                    if case in ('valid', 'lib-unit'):
+                    if case in ('valid', 'lib-unit', 'valid-audio', 'valid-reset'):
                         check()
                     else:
                         with self.assertRaises(ValueError):
@@ -314,6 +381,11 @@ class KioskAcceptanceTests(unittest.TestCase):
                     'ExtensionInstallBlocklist': ['*'], 'IncognitoModeAvailability': 1,
                     'PrintingEnabled': False, 'URLBlocklist': ['view-source:*']}),
             }
+            # Keep the contained-read fixture's valid units/launcher identical to
+            # make_deployment; each is subsequently replaced by an escaping link.
+            for name in list(files):
+                if name.endswith('.conf') or name.endswith('.service') or name == 'usr/bin/dd-kiosk-browser':
+                    files[name] = (root / name).read_text()
             for name, content in files.items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)

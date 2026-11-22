@@ -80,7 +80,158 @@ CHROMIUM_POLICY = {
 }
 
 
-def verify_kiosk_policy(deployment, file, entry, read, expected_url):
+def unit_settings(contents):
+    """Parse active unit assignments; reject syntax we cannot interpret safely."""
+    section = None
+    result = {}
+    logical = ''
+    for line in contents.splitlines():
+        line = line.strip()
+        if not line or line.startswith(('#', ';')):
+            continue
+        logical += line
+        if len(logical) - len(logical.rstrip('\\')) & 1:
+            logical = logical[:-1] + ' '
+            continue
+        line, logical = logical, ''
+        if line.startswith('[') and line.endswith(']'):
+            section = line[1:-1]
+            continue
+        if section is None or '=' not in line:
+            raise ValueError('image kiosk unit has unsupported syntax')
+        key, value = line.split('=', 1)
+        if '\\' in value or '%' in value:
+            raise ValueError('image kiosk unit has unqualified escaping or specifiers')
+        result.setdefault((section, key.strip()), []).append(value.strip())
+    if logical:
+        raise ValueError('image kiosk unit has unfinished continuation')
+    return result
+
+
+def verify_effective_kiosk_unit(deployment, file, entry, read, listdir, unit):
+    """Fail closed on unrecognised overrides instead of guessing systemd policy.
+
+    Only shipped kiosk drop-ins are admitted. Global, dash-prefix,
+    runtime and administrator overrides must be qualified before acceptance.
+    Directory traversal and symlinks use the same image-contained resolver as
+    the payload reads, including when the image uses /lib -> /usr/lib.
+    """
+    roots = ('/etc/systemd/system.control', '/run/systemd/system.control',
+             '/run/systemd/transient', '/run/systemd/generator.early',
+             '/etc/systemd/system', '/etc/systemd/system.attached',
+             '/run/systemd/system', '/run/systemd/system.attached',
+             '/run/systemd/generator',
+             '/usr/local/lib/systemd/system', '/usr/lib/systemd/system',
+             '/lib/systemd/system', '/run/systemd/generator.late')
+    dropins = ('service.d', 'dd-.service.d', 'dd-kiosk-.service.d',
+               'dd-kiosk-browser.service.d')
+    expected = {
+        file('/usr/lib/systemd/system/dd-kiosk-browser.service.d/' + name)
+        for name in ('zzzz-native-runtime.conf', 'zzzzzz-screen-etnaviv-context.conf')}
+    audio_contracts = {
+        'audio.conf': {('Unit', 'After'): ['pulseaudio.service'],
+                       ('Unit', 'Wants'): ['pulseaudio.service'],
+                       ('Service', 'SupplementaryGroups'): ['render video audio'],
+                       ('Service', 'Environment'): ['PULSE_SERVER=unix:/tmp/pulseaudio.socket']},
+        'screen-audio.conf': {('Service', 'Environment'): [
+            'PULSE_SINK=alsa_output.platform-sound-tas2555.stereo-fallback']},
+    }
+    optional = {}
+    for name, contract in audio_contracts.items():
+        path = '/usr/lib/systemd/system/dd-kiosk-browser.service.d/' + name
+        parent = resolve_artifact_file(deployment, str(pathlib.PurePosixPath(path).parent), entry, directory=True)
+        if entry(parent + '/' + name) is not None:
+            resolved = file(path)
+            if unit_settings(read(resolved)) != contract:
+                raise ValueError('image kiosk service has an unqualified audio drop-in')
+            optional[resolved] = contract
+    found = set()
+    for root in roots:
+        for directory in ('', *dropins):
+            path = root + ('/' + directory if directory else '')
+            # Probe one resolved component at a time: never follow host parents.
+            current = deployment.rstrip('/')
+            for component in path.strip('/').split('/'):
+                candidate = current + '/' + component
+                if entry(candidate) is None:
+                    break
+                relative = candidate[len(deployment.rstrip('/')):]
+                current = resolve_artifact_file(deployment, relative, entry, directory=True)
+            else:
+                names = listdir(current)
+                if not directory:
+                    if 'dd-kiosk-browser.service' in names:
+                        if file(root + '/dd-kiosk-browser.service') != unit:
+                            raise ValueError('image kiosk service has an unqualified unit override')
+                    continue
+                for name in names:
+                    if not name.endswith('.conf'):
+                        continue
+                    resolved = file(path + '/' + name)
+                    if directory != 'dd-kiosk-browser.service.d' or resolved not in expected | optional.keys():
+                        raise ValueError('image kiosk service has an unqualified drop-in: ' + path + '/' + name)
+                    found.add(resolved)
+    if not expected <= found:
+        raise ValueError('image kiosk service lacks its runtime drop-ins')
+    settings = unit_settings(read(unit))
+    supported = {
+        'Unit': {'Description', 'After', 'Wants', 'Conflicts', 'StartLimitIntervalSec'},
+        'Service': {'Type', 'User', 'Group', 'SupplementaryGroups', 'StateDirectory',
+                    'EnvironmentFile', 'ExecStart', 'Restart', 'RestartSec',
+                    'Environment', 'UnsetEnvironment'},
+        'Install': {'WantedBy'},
+    }
+    if any(key not in supported.get(section, set()) for section, key in settings):
+        raise ValueError('image kiosk service has unqualified unit directives')
+    for name in sorted(found, key=lambda path: pathlib.PurePosixPath(path).name):
+        for key, values in unit_settings(read(name)).items():
+            if name not in optional and key not in (('Service', 'Environment'), ('Service', 'UnsetEnvironment'), ('Service', 'ExecStart')):
+                raise ValueError('image kiosk runtime drop-in has unsupported directives')
+            settings.setdefault(key, []).extend(values)
+    def scalar(section, key, expected_value):
+        values = settings.get((section, key), [])
+        if not values or values[-1] != expected_value:
+            raise ValueError(f'image kiosk service lacks effective {key}={expected_value}')
+    def words(section, key):
+        result = []
+        for value in settings.get((section, key), []):
+            if not value:
+                result = []
+            else:
+                result.extend(shlex.split(value))
+        return result
+    for key, value in {'User': 'weston', 'Group': 'weston',
+                       'Restart': 'always', 'Type': 'simple'}.items():
+        scalar('Service', key, value)
+    for key, value in {'ExecStart': ['/usr/bin/dd-kiosk-browser'],
+                       'StateDirectory': ['dd-kiosk-browser'],
+                       'EnvironmentFile': ['-/etc/default/dd-kiosk-browser']}.items():
+        if words('Service', key) != value:
+            raise ValueError('image kiosk service has incorrect effective ' + key)
+    groups = {'render', 'video'}
+    if any(pathlib.PurePosixPath(path).name == 'audio.conf' for path in optional):
+        groups.add('audio')
+    if set(words('Service', 'SupplementaryGroups')) != groups:
+        raise ValueError('image kiosk service has incorrect effective SupplementaryGroups')
+    if 'weston.service' not in words('Unit', 'After') or 'multi-user.target' not in words('Install', 'WantedBy'):
+        raise ValueError('image kiosk service lacks boot ordering or target')
+    environment = dict(value.split('=', 1) for value in words('Service', 'Environment'))
+    unset = words('Service', 'UnsetEnvironment')
+    if environment.get('DD_KIOSK_GLES2_COMPAT') != '1' or any(
+            value in unset for value in ('DD_KIOSK_GLES2_COMPAT', 'DD_KIOSK_GLES2_COMPAT=1')):
+        raise ValueError('image kiosk service lacks effective GLES2 context')
+    if 'LD_LIBRARY_PATH' not in unset:
+        raise ValueError('image kiosk service lacks native runtime environment guard')
+    expected_environment = {'DD_KIOSK_GLES2_COMPAT': '1'}
+    for contract in optional.values():
+        for assignment in contract.get(('Service', 'Environment'), []):
+            key, value = assignment.split('=', 1)
+            expected_environment[key] = value
+    if environment != expected_environment:
+        raise ValueError('image kiosk service has unqualified environment assignments')
+
+
+def verify_kiosk_policy(deployment, file, entry, read, expected_url, listdir):
     """Boot, graphics and service policy shared by all three image views."""
     parent = resolve_artifact_file(deployment, str(pathlib.PurePosixPath(KIOSK_ENABLEMENT).parent),
                                    entry, directory=True)
@@ -97,16 +248,18 @@ def verify_kiosk_policy(deployment, file, entry, read, expected_url):
             continue
     if enabled_file not in units:
         raise ValueError('image enabled kiosk service does not resolve to its unit')
-    service = read(enabled_file)
-    for setting in ('User=weston', 'StateDirectory=dd-kiosk-browser', 'Restart=always', 'After=weston.service'):
-        if setting not in service:
-            raise ValueError(f'image kiosk service lacks {setting}')
+    verify_effective_kiosk_unit(deployment, file, entry, read, listdir, enabled_file)
     for name, settings in KIOSK_CONTENTS.items():
         content = read(file(name))
         if any(setting not in content for setting in settings):
             raise ValueError(f'image kiosk policy differs from expected content: {name}')
-        if name == '/usr/bin/dd-kiosk-browser' and '--disable-gpu' in content:
-            raise ValueError('image kiosk launcher disables GPU acceleration')
+        if name == '/usr/bin/dd-kiosk-browser':
+            commands = re.findall(r'^\s*exec /usr/bin/chromium\s+([^\n]*)', content.replace('\\\n', ' '), re.M)
+            if len(commands) != 1:
+                raise ValueError('image kiosk launcher lacks a unique Chromium exec')
+            arguments = shlex.split(commands[0], comments=True)
+            if not {'--ozone-platform=wayland', '--kiosk'} <= set(arguments) or '--disable-gpu' in arguments:
+                raise ValueError('image kiosk launcher has incorrect active GPU/kiosk flags')
     policy = json.loads(read(file('/etc/chromium/policies/managed/dd-kiosk-browser.json')))
     for name, value in CHROMIUM_POLICY.items():
         if policy.get(name) != value:
@@ -216,12 +369,12 @@ def resolve_artifact_file(deployment, filename, entry, executable=False, directo
     raise ValueError(f'OTA file resolves to a directory: {filename}')
 
 
-def verify_artifact_payload(deployment, entry, read, expected_url, paths):
+def verify_artifact_payload(deployment, entry, read, expected_url, paths, listdir):
     for name in ARTIFACT_FILES:
         resolve_artifact_file(
             deployment, name, entry, executable=name in ARTIFACT_EXECUTABLES)
     file = lambda name, executable=False: resolve_artifact_file(deployment, name, entry, executable)
-    verify_kiosk_policy(deployment, file, entry, read, expected_url)
+    verify_kiosk_policy(deployment, file, entry, read, expected_url, listdir)
     verify_display_payload(
         file, read, paths)
 
@@ -298,7 +451,8 @@ def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
                     paths.extend('/usr/' + library + '/' + module_dir + '/' + name
                                  for name in entries(image, module_path))
             verify_artifact_payload(deployment, lambda name: entry(image, name),
-                                    lambda name: read(image, name), expected_url, paths)
+                                    lambda name: read(image, name), expected_url, paths,
+                                    lambda name: entries(image, quote(name)))
     print(f'OTA ext4 kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
     return {deployment.lstrip('/') for deployment in deployments}
 
@@ -344,7 +498,9 @@ def verify_ota_tar(path, deployments, expected_url=JAGUAR_START_URL):
         for deployment in tar_deployments:
             paths = [name[len(deployment):] for name in metadata
                      if name.startswith(deployment + '/')]
-            verify_artifact_payload(deployment, metadata.get, read, expected_url, paths)
+            verify_artifact_payload(deployment, metadata.get, read, expected_url, paths,
+                                    lambda directory: [name[len(directory) + 1:] for name in metadata
+                                                       if name.startswith(directory + '/') and '/' not in name[len(directory) + 1:]])
     print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
 
@@ -461,7 +617,8 @@ def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     verify_kiosk_policy(
         str(rootfs.resolve()),
         lambda name, executable=False: rootfs_file(rootfs, name, executable),
-        rootfs_entry, lambda path: path.read_text(), expected_url)
+        rootfs_entry, lambda path: path.read_text(), expected_url,
+        lambda directory: [path.name for path in pathlib.Path(directory).iterdir()])
     print(f'rootfs payload and kiosk service: verified at {rootfs}')
 
 

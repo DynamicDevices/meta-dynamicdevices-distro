@@ -14,6 +14,36 @@ FILES = ROOT / "dd-kiosk-browser"
 
 
 class KioskStartupTests(unittest.TestCase):
+    def test_touch_recipe_preserves_configured_browser_paths(self):
+        recipe = (ROOT.parent / 'jaguar-touch-test/jaguar-touch-test_1.0.bb').read_text()
+        helper = recipe[recipe.index('def jaguar_browser_replacement(d):'):recipe.index('\ndo_install()')]
+        namespace = {}
+        exec(helper, namespace)
+        install = recipe.split('do_install() {\n', 1)[1].split('\n}', 1)[0]
+        with tempfile.TemporaryDirectory(prefix='touch-recipe-') as directory:
+            work = Path(directory)
+            source = ROOT.parent / 'jaguar-touch-test/jaguar-touch-test'
+            for name in ('browser', 'browser&one|two', 'browser\\name',
+                         'browser "quoted" $dollar `tick`', "browser's }brace"):
+                with self.subTest(name=name):
+                    browser = work / name
+                    browser.write_text('#!/bin/sh\nprintf "exact browser reached\\n"\n')
+                    browser.chmod(0o755)
+                    data = type('Data', (), {'getVar': lambda self, key: str(browser)})()
+                    command = install.replace('${@jaguar_browser_replacement(d)}',
+                                              namespace['jaguar_browser_replacement'](data))
+                    for key, value in {'D': str(work / 'image'), 'datadir': '/usr/share',
+                                       'bindir': '/usr/bin', 'WORKDIR': str(source)}.items():
+                        command = command.replace('${' + key + '}', value)
+                    rendered = subprocess.run(['/bin/sh', '-ec', command],
+                                              capture_output=True, text=True, timeout=5)
+                    self.assertEqual(rendered.returncode, 0, rendered.stderr)
+                    result = subprocess.run(['/bin/sh', str(work / 'image/usr/bin/jaguar-touch-test')],
+                                            env={'PATH': os.defpath}, capture_output=True,
+                                            text=True, timeout=5)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, 'exact browser reached\n')
+
     def launch(self, **settings):
         with tempfile.TemporaryDirectory(prefix="kiosk-startup-") as directory:
             runtime = Path(directory)

@@ -84,6 +84,14 @@ policy, network hook, offline page, Weston kiosk shell, and panel transform.
 The rootfs check inspects BitBake's staging tree. The verifier also decompresses
 the OTA ext4 artifact and uses `debugfs` to confirm the kiosk files and service
 are present in every OSTree deployment checkout in the shipped filesystem.
+The same service-policy checks run on staging, tar and ext4: active systemd
+assignments, list resets, the final Chromium command, boot ordering, service
+identity, environment and restart policy. Comments do not count as settings.
+The verifier admits the shipped native-runtime, GLES2 and optional audio
+drop-ins; other kiosk overrides (including global, dash-prefix, generated,
+runtime or administrator units/drop-ins) fail closed until qualified. It does
+not claim to implement every systemd directive. Configured touch-test browser
+paths are escaped for both the installed shell launcher and sed replacement.
 It also checks the WIC boot FAT and compares the WIC root partition byte for
 byte with the verified OTA ext4. Inspect the actual boot files and
 test both installation paths before hardware acceptance.
