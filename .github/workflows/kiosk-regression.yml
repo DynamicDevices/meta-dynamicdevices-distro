@@ -1,0 +1,33 @@
+name: Kiosk regressions
+
+on:
+  pull_request:
+    branches: [main, test/chromium-foundries-retry-20261012]
+  push:
+    branches: [main, test/chromium-foundries-retry-20261012]
+
+permissions:
+  contents: read
+
+jobs:
+  kiosk-regression:
+    name: Kiosk regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout distro layer
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check kiosk startup and configuration
+        run: |
+          python3 -B -m unittest discover -s tests -v
+          python3 -B -m unittest discover -s recipes-graphics/dd-kiosk-browser -p 'test_*.py' -v
+      - name: Check touch, gestures and recipe wiring
+        run: |
+          node scripts/test-jaguar-touch-test.mjs
+          node recipes-graphics/jaguar-touch-test/test-jaguar-touch-test.cjs
+      - name: Check launcher syntax
+        run: |
+          sh -n recipes-graphics/dd-kiosk-browser/dd-kiosk-browser/dd-kiosk-browser
+          sh -n recipes-graphics/jaguar-touch-test/jaguar-touch-test/jaguar-touch-test

@@ -2,10 +2,11 @@
 
 The recipe enables `dd-kiosk-browser.service` at boot. It waits for Weston's
 Wayland socket and opens the configured URL in the kiosk browser. The current
-default is Taylor Swift's official *Shake It Off* YouTube watch page, requesting
+Jaguar Screen default is Taylor Swift's official *Shake It Off* YouTube watch page, requesting
 muted autoplay and single-video looping (`loop=1&playlist=nfWlot6h_JM`).
 YouTube player fullscreen is not requested. Playback still
 depends on connectivity and YouTube's availability and browser policies.
+Other machines retain the product website and unmuted browser default.
 
 ## Change the startup page
 

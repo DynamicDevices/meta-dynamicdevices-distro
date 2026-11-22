@@ -2,7 +2,7 @@ name: yocto-lens static scan
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/chromium-foundries-retry-20261012]
     paths:
       - '**/*.bb'
       - '**/*.bbappend'
@@ -10,7 +10,7 @@ on:
       - 'conf/**'
       - '.github/workflows/yocto-lens.yml'
   pull_request:
-    branches: [main]
+    branches: [main, test/chromium-foundries-retry-20261012]
     paths:
       - '**/*.bb'
       - '**/*.bbappend'
@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout distro layer
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout BSP layer
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: DynamicDevices/meta-dynamicdevices-bsp
           path: meta-dynamicdevices-bsp
@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload JSON report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: yocto-lens-json
           path: ${{ runner.temp }}/yocto-lens/yocto-lens-dd-layers.json
@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload SARIF report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: yocto-lens-sarif
           path: ${{ runner.temp }}/yocto-lens/yocto-lens-dd-layers.sarif

@@ -40,7 +40,8 @@ Before installation, back up and inspect the board's exact Weston configuration
 and drop-ins against the candidate; do not change the running G2D image to use
 GL libraries in place. After OTA, verify the effective command selects GL, the
 current invocation loads Mesa and the GL renderer, the kernel exposes Etnaviv,
-and the homepage is `https://active-esl.com`. Confirm actual rendering on the
+and Jaguar Screen opens its configured normal YouTube watch page with silent
+autoplay and single-video looping. Confirm actual rendering on the
 physical panel. An active DRM scanout, lit backlight, screenshot or running
 browser alone does not establish visible success. Keep rollback available.
 
@@ -73,6 +74,10 @@ a runtime fix for Chromium rendering under Vivante.
 
 After the image build, run `scripts/verify-kiosk-image.py` with the candidate
 package manifest, WIC gzip, both OTA artifacts, and the BitBake image rootfs.
+The default expected URL is Jaguar Screen's silent autoplay/loop URL. Pass
+`--expected-url 'https://example.com/start'` for a deliberate startup override.
+The verifier also requires the shared touch rule, diagnostic page and executable
+touch launcher in the rootfs and shipped OSTree deployment payloads.
 It checks compressed-file integrity and SHA-256, package membership and size
 against active target 2945, plus the installed Chromium binary, service,
 policy, network hook, offline page, Weston kiosk shell, and panel transform.
@@ -125,7 +130,7 @@ a kiosk test result.
 | Boot | New deployment selected; Weston and `dd-kiosk-browser` active without restart loop | Pending |
 | Render | Fullscreen page fills the panel in the intended orientation; no browser chrome or dialogs | Pending |
 | Touch | Tap, scroll and any required text input work; public input cannot leave the kiosk page | Pending |
-| Audio | Chromium plays through the BSP-selected `tas2555audio` card in the selected ROM1 or SmartAmp mode; physical speaker sound follows play/pause/play without clipping | Pending |
+| Audio | Jaguar Screen starts muted for the button test. No sound is expected until deliberately unmuted; separate BSP/audio work must establish speaker playback and protection acceptance | Pending |
 | Network loss | Remote test URL may show a transient error, but the service stays recoverable | Pending |
 | Network return | NetworkManager dispatcher restarts Chromium and the configured URL loads | Pending |
 | Browser crash | Killing Chromium causes systemd restart without a restore prompt | Pending |

@@ -134,13 +134,14 @@ class NativeWindowABITests(unittest.TestCase):
         ])
         self.assertEqual(self.link().returncode, 0)
 
-    def test_recipe_only_reverses_patch_and_preserves_j16_and_streaming(self):
+    def test_recipe_reverses_patch_inherits_parallelism_and_preserves_streaming(self):
         recipe = RECIPE.read_text()
         self.assertIn("if grep -Fq '#include <gbm.h>'", recipe)
         self.assertNotIn("if ! grep -Fq '#include <gbm.h>'", recipe)
         self.assertIn('patch -d "${S}" -p1 --reverse --fuzz=0', recipe)
         self.assertIn('${DD_CHROMIUM_LEGACY_GBM_PATCH}:True', recipe)
-        self.assertIn('PARALLEL_MAKE = "-j 16"', recipe)
+        self.assertNotRegex(recipe, r'(?m)^PARALLEL_MAKE\s*[:?+]?=')
+        self.assertIn('ninja ${PARALLEL_MAKE} chrome', recipe)
         self.assertIn('python3 "${DD_CHROMIUM_LIVE_BUILD}"', recipe)
 
 

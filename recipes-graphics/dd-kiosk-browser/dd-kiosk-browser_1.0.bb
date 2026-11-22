@@ -29,6 +29,10 @@ RDEPENDS:${PN} = "chromium-ozone-wayland networkmanager-daemon"
 
 DD_KIOSK_GLES2_COMPAT ?= "0"
 DD_KIOSK_GLES2_COMPAT:imx8mm-jaguar-screen = "1"
+DD_KIOSK_START_URL ?= "https://active-esl.com"
+DD_KIOSK_START_URL:imx8mm-jaguar-screen = "https://www.youtube.com/watch?v=nfWlot6h_JM&autoplay=1&mute=1&loop=1&playlist=nfWlot6h_JM"
+DD_KIOSK_START_MUTED ?= "0"
+DD_KIOSK_START_MUTED:imx8mm-jaguar-screen = "1"
 # The machine's ALSA recipe owns its default hardware routing configuration.
 RDEPENDS:${PN}:append:imx8mm-jaguar-screen = " alsa-state"
 
@@ -37,6 +41,9 @@ do_install() {
     install -m 0755 ${WORKDIR}/dd-kiosk-browser ${D}${bindir}/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.service ${D}${systemd_system_unitdir}/dd-kiosk-browser.service
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.env ${D}${sysconfdir}/default/dd-kiosk-browser
+    dd_kiosk_start_url=$(printf '%s' '${DD_KIOSK_START_URL}' | sed 's/[\\&|]/\\&/g')
+    sed -i "s|^DD_KIOSK_URL=.*|DD_KIOSK_URL=$dd_kiosk_start_url|" ${D}${sysconfdir}/default/dd-kiosk-browser
+    sed -i 's/^DD_KIOSK_MUTE_AUDIO=.*/DD_KIOSK_MUTE_AUDIO=${DD_KIOSK_START_MUTED}/' ${D}${sysconfdir}/default/dd-kiosk-browser
     sed -i 's/^DD_KIOSK_GLES2_COMPAT=.*/DD_KIOSK_GLES2_COMPAT=${DD_KIOSK_GLES2_COMPAT}/' ${D}${sysconfdir}/default/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/offline.html ${D}${datadir}/dd-kiosk-browser/offline.html
     install -m 0755 ${WORKDIR}/90-dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d/90-dd-kiosk-browser

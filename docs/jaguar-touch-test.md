@@ -10,7 +10,10 @@ resolved after removing the stale `-3.2 0 1 0 1.171875 0` userspace hotfix.
 
 Jaguar kiosk images also include `jaguar-touch-test`, a local HTML diagnostic,
 and the `jaguar-touch-test` launcher. It reuses the selected kiosk runtime and
-does not replace the configured boot URL or change calibration. An existing
+does not replace the configured boot URL or change calibration. The recipe
+selects `/usr/bin/${DD_KIOSK_BROWSER_RUNTIME}` (default `dd-kiosk-browser`);
+set `DD_KIOSK_TEST_BROWSER` in build configuration for a differently named
+provider executable, or override it for a direct test invocation. An existing
 Flutter test is also available through `screen-flutter-demo` and
 `ivi-homescreen-multi-touch-test`; the browser page avoids needing that separate
 application stack for a browser-image bench check.

@@ -6,6 +6,7 @@ import hashlib
 import json
 import lzma
 import pathlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -13,14 +14,21 @@ import tarfile
 import tempfile
 
 REQUIRED = {'chromium-ozone-wayland', 'dd-kiosk-browser', 'weston',
-            'networkmanager-daemon', 'packagegroup-dd-kiosk-browser'}
+            'networkmanager-daemon', 'packagegroup-dd-kiosk-browser',
+            'jaguar-screen-touch', 'jaguar-touch-test'}
+JAGUAR_START_URL = 'https://www.youtube.com/watch?v=nfWlot6h_JM&autoplay=1&mute=1&loop=1&playlist=nfWlot6h_JM'
+JAGUAR_TOUCH_FILES = (
+    '/etc/udev/rules.d/99-jaguar-screen-touch.rules',
+    '/usr/share/jaguar-touch-test/index.html',
+    '/usr/bin/jaguar-touch-test',
+)
 FORBIDDEN_PREFIXES = (
     'waydroid', 'packagegroup-dd-android-container',
     'screen-flutter-demo', 'flutter', 'libflutter',
     'packagegroup-dd-flutter', 'ivi-homescreen',
     'godot', 'screen-godot-smoke', 'screen-aero-demo',
 )
-ARTIFACT_FILES = (
+ARTIFACT_FILES = JAGUAR_TOUCH_FILES + (
     '/usr/bin/chromium',
     '/usr/bin/dd-kiosk-browser',
     '/usr/libexec/dd-kiosk-linker-guard',
@@ -203,8 +211,31 @@ def verify_etnaviv_weston(rootfs):
         raise ValueError('rootfs Etnaviv Weston includes the NXP G2D renderer')
 
 
-def verify_rootfs(rootfs):
+def verify_startup_url(rootfs, expected_url):
+    environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
+    configured = None
+    for line in environment.splitlines():
+        if line.startswith('DD_KIOSK_URL='):
+            parts = shlex.split(line.partition('=')[2], comments=False)
+            if len(parts) != 1:
+                raise ValueError('rootfs kiosk URL is missing or malformed')
+            configured = parts[0]
+    if configured != expected_url:
+        raise ValueError(f'rootfs kiosk URL differs from expected URL: {expected_url}')
+
+
+def verify_jaguar_touch(rootfs):
+    missing = [name for name in JAGUAR_TOUCH_FILES
+               if not (rootfs / name.lstrip('/')).is_file()]
+    if missing:
+        raise ValueError(f'rootfs missing Jaguar touch payload: {missing}')
+    if not (rootfs / 'usr/bin/jaguar-touch-test').stat().st_mode & 0o111:
+        raise ValueError('rootfs Jaguar touch launcher is not executable')
+
+
+def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     verify_etnaviv_weston(rootfs)
+    verify_jaguar_touch(rootfs)
     context = rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf'
     if not context.is_file() or 'Environment=DD_KIOSK_GLES2_COMPAT=1' not in context.read_text():
         raise ValueError('rootfs lacks Screen ES2 Chromium compatibility policy')
@@ -256,9 +287,7 @@ def verify_rootfs(rootfs):
     weston_guard = (rootfs / 'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf').read_text()
     if 'ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard' not in weston_guard:
         raise ValueError('rootfs Weston service does not gate mixed-deployment linkage')
-    environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
-    if 'DD_KIOSK_URL=https://active-esl.com' not in environment:
-        raise ValueError('rootfs kiosk URL is not https://active-esl.com')
+    verify_startup_url(rootfs, expected_url)
     weston = (rootfs / 'etc/xdg/weston/weston-screen.ini').read_text()
     if 'shell=kiosk-shell.so' not in weston:
         raise ValueError('rootfs Weston config does not select kiosk shell')
@@ -305,6 +334,8 @@ def main():
     p.add_argument('--ota-tar-xz', type=pathlib.Path, required=True)
     p.add_argument('--rootfs', type=pathlib.Path, required=True,
                    help='BitBake image rootfs directory to inspect installed files')
+    p.add_argument('--expected-url', default=JAGUAR_START_URL,
+                   help='Expected configured startup URL; defaults to Jaguar Screen silent YouTube autoplay/loop')
     args = p.parse_args()
     for name in ('baseline_wic_gz_bytes', 'baseline_ota_ext4_gz_bytes',
                  'baseline_ota_tar_xz_bytes'):
@@ -313,7 +344,7 @@ def main():
     if not args.rootfs.is_dir():
         p.error(f'--rootfs does not name a directory: {args.rootfs}')
     try:
-        verify_rootfs(args.rootfs)
+        verify_rootfs(args.rootfs, args.expected_url)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         p.error(str(exc))
     candidate = packages(args.candidate_manifest)

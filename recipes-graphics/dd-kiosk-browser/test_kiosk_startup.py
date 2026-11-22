@@ -1,6 +1,7 @@
 """Local launcher regression tests; no device, browser or network required."""
 
 import os
+import re
 from pathlib import Path
 import socket
 import subprocess
@@ -95,8 +96,37 @@ class KioskStartupTests(unittest.TestCase):
         self.assertIn('DD_KIOSK_GLES2_COMPAT=${DD_KIOSK_GLES2_COMPAT}', recipe)
         self.assertIn('EnvironmentFile=-/etc/default/dd-kiosk-browser', service)
         self.assertIn('WantedBy=multi-user.target', service)
-        self.assertIn('DD_KIOSK_URL=https://www.youtube.com/watch?v=nfWlot6h_JM&autoplay=1&mute=1&loop=1&playlist=nfWlot6h_JM', defaults)
-        self.assertIn('DD_KIOSK_MUTE_AUDIO=1', defaults)
+        self.assertIn('DD_KIOSK_START_URL:imx8mm-jaguar-screen = "https://www.youtube.com/watch?v=nfWlot6h_JM&autoplay=1&mute=1&loop=1&playlist=nfWlot6h_JM"', recipe)
+        self.assertIn('DD_KIOSK_URL=https://active-esl.com', defaults)
+        self.assertIn('DD_KIOSK_MUTE_AUDIO=0', defaults)
+
+    def test_installed_defaults_are_machine_scoped_and_preserve_ampersands(self):
+        recipe = (ROOT / "dd-kiosk-browser_1.0.bb").read_text()
+        # Execute the real recipe's URL/mute rendering block, not a duplicate
+        # Python implementation of sed's replacement/escaping behaviour.
+        block = re.search(r'(?m)^    dd_kiosk_start_url=.*\n    sed -i .*\n    sed -i .*', recipe)[0]
+        for machine in ('imx8mm-jaguar-screen', 'another-machine'):
+            def setting(name):
+                override = re.search(r'^' + name + ':' + machine + r' = "([^"]+)"', recipe, re.M)
+                return override[1] if override else re.search(r'^' + name + r' \?= "([^"]+)"', recipe, re.M)[1]
+            url, mute = setting('DD_KIOSK_START_URL'), setting('DD_KIOSK_START_MUTED')
+            with self.subTest(machine=machine), tempfile.TemporaryDirectory() as directory:
+                installed = Path(directory) / 'etc/default/dd-kiosk-browser'
+                installed.parent.mkdir(parents=True)
+                installed.write_text((FILES / 'dd-kiosk-browser.env').read_text())
+                script = block.replace('${DD_KIOSK_START_URL}', url).replace('${DD_KIOSK_START_MUTED}', mute)
+                script = script.replace('${D}', directory).replace('${sysconfdir}', '/etc')
+                result = subprocess.run(['/bin/sh', '-ec', script], text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                environment = dict(line.split('=', 1) for line in installed.read_text().splitlines()
+                                   if line and not line.startswith('#'))
+                self.assertEqual(environment['DD_KIOSK_URL'], url)
+                self.assertEqual(environment['DD_KIOSK_MUTE_AUDIO'], mute)
+                if machine == 'imx8mm-jaguar-screen':
+                    self.assertIn('&loop=1&playlist=nfWlot6h_JM', url)
+                    self.assertEqual(mute, '1')
+                else:
+                    self.assertEqual((url, mute), ('https://active-esl.com', '0'))
 
 
 if __name__ == "__main__":

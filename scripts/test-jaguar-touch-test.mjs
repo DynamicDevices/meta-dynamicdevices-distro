@@ -171,13 +171,25 @@ assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb')
 assert.match(read('recipes-core/packagegroups/packagegroup-dd-kiosk-browser.bb'),
     /RDEPENDS:\$\{PN\} = "\$\{DD_KIOSK_BROWSER_RUNTIME\}"/);
 const launcher = read('recipes-graphics/jaguar-touch-test/jaguar-touch-test/jaguar-touch-test')
-    .replace('exec /usr/bin/dd-kiosk-browser', 'printf \'%s\\n%s\\n\' "$DD_KIOSK_GLES2_COMPAT" "$DD_KIOSK_URL"');
+    .replace('exec "${DD_KIOSK_TEST_BROWSER:-/usr/bin/dd-kiosk-browser}"', 'printf \'%s\\n%s\\n%s\\n\' "$DD_KIOSK_GLES2_COMPAT" "$DD_KIOSK_URL" "${DD_KIOSK_TEST_BROWSER:-/usr/bin/dd-kiosk-browser}"');
 for (const override of [undefined,'0','1']) {
     const env = {PATH:process.env.PATH};
     if (override !== undefined) env.DD_KIOSK_GLES2_COMPAT = override;
     const result = spawnSync('sh',['-c',launcher,'jaguar-touch-test','--gestures'],{env,encoding:'utf8'});
     assert.equal(result.status,0,result.stderr);
     assert.deepEqual(result.stdout.trim().split('\n'),[
-        override ?? '1','file:///usr/share/jaguar-touch-test/index.html?mode=gestures']);
+        override ?? '1','file:///usr/share/jaguar-touch-test/index.html?mode=gestures','/usr/bin/dd-kiosk-browser']);
+}
+assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'), /d\.getVar\('DD_KIOSK_BROWSER_RUNTIME'\)/);
+assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'), /sed -i .*\$\{DD_KIOSK_TEST_BROWSER\}/);
+for (const provider of ['dd-kiosk-browser','alternate-kiosk']) {
+    const installed = launcher.replaceAll('/usr/bin/dd-kiosk-browser', '/usr/bin/' + provider);
+    for (const caller of [undefined, '/opt/custom-browser']) {
+        const env = {PATH:process.env.PATH};
+        if (caller) env.DD_KIOSK_TEST_BROWSER = caller;
+        const result = spawnSync('sh',['-c',installed,'jaguar-touch-test'],{env,encoding:'utf8'});
+        assert.equal(result.status,0,result.stderr);
+        assert.equal(result.stdout.trim().split('\n')[2],caller ?? '/usr/bin/' + provider);
+    }
 }
 console.log('PASS: selected browser provider dependency, direct-launch GLES2 default and explicit overrides');

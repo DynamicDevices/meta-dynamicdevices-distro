@@ -62,7 +62,8 @@ Feature bundles expand prerequisites centrally. In particular,
 select their respective UI runtimes and also imply the display runtime.
 `kiosk-browser` selects Chromium Ozone Wayland and a Weston-owned fullscreen
 launcher, and also implies the display runtime. Its URL is configured in
-`/etc/default/dd-kiosk-browser`; the default is a local provisioning page.
+`/etc/default/dd-kiosk-browser`; generic products default to `https://active-esl.com`.
+Only Jaguar Screen defaults to the approved silent YouTube autoplay/loop page.
 On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
 become part of the public display. Audio remains an explicit `audio` feature;
 select it for browser playback so Chromium is built with its audio backend and
@@ -99,6 +100,10 @@ Runtime payloads are owned by provider-neutral packagegroups:
 defaults to `dd-kiosk-browser`. That runtime package supplies the Chromium
 launcher and depends on `chromium-ozone-wayland`; a different browser runtime
 can replace it without changing the image hook or packagegroup.
+The manual Jaguar touch test follows the selected runtime's same-named launcher
+in `/usr/bin`. Set `DD_KIOSK_TEST_BROWSER` explicitly in build configuration when
+a provider uses a different executable name; a direct invocation can override
+the same variable. No alternate runtime is assumed to supply Chromium's launcher.
 
 The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is
