@@ -157,10 +157,15 @@ function remember(point, down) {
     if (history.length > 5000) history.splice(0, history.length - 5000);
 }
 
+function activeContacts() {
+    if (touches.size) return touches;
+    return nativeSeen ? new Map(Array.from(pointers).filter(([,point]) => point.compatibilityId === undefined)) : pointers;
+}
+
 function updateGesture() {
     if (mode !== 'gestures') return;
-    const source = nativeSeen ? 'native' : 'pointer';
-    const active = nativeSeen ? touches : pointers;
+    const source = touches.size ? 'native' : 'pointer';
+    const active = activeContacts();
     const points = Array.from(active.entries()).sort((a,b)=>a[1].slot-b[1].slot).slice(0,2);
     if (!points.length) { gesture = null; return; }
     const first = points[0][1], second = points[1]?.[1];
@@ -180,7 +185,7 @@ function updateGesture() {
 }
 
 function render() {
-    const active = nativeSeen ? touches : pointers;
+    const active = activeContacts();
     maximum = Math.max(maximum, active.size);
     const needsCanvas = mode === 'contacts' || (trailVisibility[mode] && history.length > 0);
     renderMarkers(active, mode === 'gestures' && !needsCanvas);
@@ -299,16 +304,17 @@ function onPointer(event) {
         point = newPoint(pointers);
         if (event.pointerType === 'touch') point.compatibilityId = ++compatibilitySerial;
         pointers.set(event.pointerId, point);
-        if (!nativeSeen) maximum = Math.max(maximum, pointers.size);
+        maximum = Math.max(maximum, activeContacts().size);
     }
     if (point) {
         point.x = event.clientX; point.y = event.clientY;
-        if (!nativeSeen) remember(point, event.type === 'pointerdown');
+        const usable = !nativeSeen || point.compatibilityId === undefined;
+        if (usable) remember(point, event.type === 'pointerdown');
         if (event.type === 'pointerup' || event.type === 'pointercancel') pointers.delete(event.pointerId);
-        if (!nativeSeen) last = (event.pointerType||'pointer')+' '+event.type+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
+        if (usable) last = (event.pointerType||'pointer')+' '+event.type+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
     }
     // Do not cancel pointerdown: preserve Chromium's native touch event delivery.
-    if (!nativeSeen) updateGesture();
+    updateGesture();
     scheduleRender();
 }
 

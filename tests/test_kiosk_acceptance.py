@@ -35,6 +35,14 @@ class KioskAcceptanceTests(unittest.TestCase):
             path.write_text('fixture')
             path.chmod(0o755 if name in VERIFY.ARTIFACT_EXECUTABLES else 0o644)
         (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
+        for name, settings in VERIFY.KIOSK_CONTENTS.items():
+            (checkout / name.lstrip('/')).write_text('\n'.join(settings) + '\n')
+        (checkout / 'etc/chromium/policies/managed/dd-kiosk-browser.json').write_text(json.dumps(VERIFY.CHROMIUM_POLICY))
+        (checkout / 'usr/lib/systemd/system/dd-kiosk-browser.service').write_text(
+            'User=weston\nStateDirectory=dd-kiosk-browser\nRestart=always\nAfter=weston.service\n')
+        enabled = checkout / VERIFY.KIOSK_ENABLEMENT.lstrip('/')
+        enabled.unlink()
+        enabled.symlink_to('/usr/lib/systemd/system/dd-kiosk-browser.service')
         (checkout / 'usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf').write_text(
             'ExecStart=\nExecStart=/usr/libexec/dd-screen-weston --config=/etc/xdg/weston/weston-screen.ini\n')
         (checkout / 'etc/xdg/weston/weston-screen.ini').write_text('shell=kiosk-shell.so\ntransform=rotate-90\n')
@@ -160,7 +168,7 @@ class KioskAcceptanceTests(unittest.TestCase):
                 with tarfile.open(path, 'w:xz') as archive:
                     if case == 'implicit-directories':
                         for file in root.rglob('*'):
-                            if file.is_file():
+                            if file.is_file() or file.is_symlink():
                                 archive.add(file, arcname=str(file.relative_to(root)))
                     else:
                         archive.add(root, arcname='.')
@@ -204,6 +212,55 @@ class KioskAcceptanceTests(unittest.TestCase):
                             VERIFY.verify_etnaviv_weston(checkout)
                         else:
                             self.check_artifact(root, directory, artifact)
+
+    def test_kiosk_boot_and_policy_contract_in_all_image_views(self):
+        for case in ('valid', 'missing-context', 'wrong-context', 'disabled',
+                     'broken-link', 'regular-enablement', 'wrong-target',
+                     'wrong-unit-user', 'wrong-unit-restart', 'wrong-browser-policy', 'lib-unit'):
+            for artifact in ('rootfs', 'tar', 'ext4'):
+                with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory) / 'root'
+                    for deployment in self.DEPLOYMENTS:
+                        self.make_deployment(root, deployment, 'regular')
+                    checkout = root / 'ostree/deploy/test/deploy/candidate.1'
+                    context = checkout / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf'
+                    enabled = checkout / VERIFY.KIOSK_ENABLEMENT.lstrip('/')
+                    unit = checkout / 'usr/lib/systemd/system/dd-kiosk-browser.service'
+                    if case == 'missing-context':
+                        context.unlink()
+                    elif case == 'wrong-context':
+                        context.write_text('Environment=DD_KIOSK_GLES2_COMPAT=0\n')
+                    elif case in ('disabled', 'broken-link', 'regular-enablement', 'wrong-target', 'lib-unit'):
+                        enabled.unlink()
+                        if case == 'broken-link':
+                            enabled.symlink_to('/usr/lib/systemd/system/missing.service')
+                        elif case == 'regular-enablement':
+                            enabled.write_text(unit.read_text())
+                        elif case == 'wrong-target':
+                            unit.with_name('other.service').write_text(unit.read_text())
+                            enabled.symlink_to('/usr/lib/systemd/system/other.service')
+                        elif case == 'lib-unit':
+                            target = checkout / 'lib/systemd/system/dd-kiosk-browser.service'
+                            target.parent.mkdir(parents=True)
+                            unit.rename(target)
+                            enabled.symlink_to('/lib/systemd/system/dd-kiosk-browser.service')
+                    elif case == 'wrong-unit-user':
+                        unit.write_text(unit.read_text().replace('User=weston', 'User=root'))
+                    elif case == 'wrong-unit-restart':
+                        unit.write_text(unit.read_text().replace('Restart=always', 'Restart=no'))
+                    elif case == 'wrong-browser-policy':
+                        (checkout / 'etc/chromium/policies/managed/dd-kiosk-browser.json').write_text('{}')
+                    def check():
+                        if artifact == 'rootfs':
+                            with contextlib.redirect_stdout(io.StringIO()):
+                                VERIFY.verify_rootfs(checkout)
+                        else:
+                            self.check_artifact(root, directory, artifact)
+                    if case in ('valid', 'lib-unit'):
+                        check()
+                    else:
+                        with self.assertRaises(ValueError):
+                            check()
 
     def test_rootfs_environment_links_are_contained(self):
         for kind in ('absolute-escape', 'relative-escape', 'parent-escape',
@@ -263,7 +320,8 @@ class KioskAcceptanceTests(unittest.TestCase):
                 path.write_text(content)
             (root / 'usr/libexec/dd-screen-weston').chmod(0o755)
             enabled = root / 'etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
-            enabled.parent.mkdir(parents=True)
+            enabled.parent.mkdir(parents=True, exist_ok=True)
+            enabled.unlink()
             enabled.symlink_to('/usr/lib/systemd/system/dd-kiosk-browser.service')
             with contextlib.redirect_stdout(io.StringIO()):
                 VERIFY.verify_rootfs(root)

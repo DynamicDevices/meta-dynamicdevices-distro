@@ -2,6 +2,7 @@
 """Validate one completed kiosk image against the deployed screen baseline."""
 import argparse
 import fnmatch
+import functools
 import gzip
 import hashlib
 import json
@@ -45,6 +46,8 @@ ARTIFACT_FILES = JAGUAR_TOUCH_FILES + (
     '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
     '/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf',
     '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
+    '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf',
+    '/etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service',
 )
 ARTIFACT_EXECUTABLES = {
     '/usr/bin/jaguar-touch-test',
@@ -59,6 +62,56 @@ DISPLAY_MODULES = {
     'kiosk-shell.so': ('/usr/lib*/weston*/kiosk-shell.so',
                        '/usr/lib*/libweston-*/kiosk-shell.so'),
 }
+KIOSK_ENABLEMENT = '/etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
+KIOSK_CONTENTS = {
+    '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf': ('Environment=DD_KIOSK_GLES2_COMPAT=1',),
+    '/usr/bin/dd-kiosk-browser': ('--ozone-platform=wayland', '--kiosk'),
+    '/usr/libexec/dd-kiosk-linker-guard': ('kiosk-audio-hotpatch.conf', 'zz-audio-hotpatch.conf', '/sbin/ldconfig', '/ostree/deploy/'),
+    '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf': ('UnsetEnvironment=LD_LIBRARY_PATH',),
+    '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf': ('ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard',),
+    '/etc/systemd/system/weston.service.d/screen.conf': ('--config=/etc/xdg/weston/weston-screen.ini',),
+}
+CHROMIUM_POLICY = {
+    'AllowFileSelectionDialogs': False, 'BrowserAddPersonEnabled': False,
+    'BrowserGuestModeEnabled': False, 'BrowserSignin': 0,
+    'DeveloperToolsAvailability': 2, 'DownloadRestrictions': 3,
+    'ExtensionInstallBlocklist': ['*'], 'IncognitoModeAvailability': 1,
+    'PrintingEnabled': False, 'URLBlocklist': ['view-source:*'],
+}
+
+
+def verify_kiosk_policy(deployment, file, entry, read, expected_url):
+    """Boot, graphics and service policy shared by all three image views."""
+    parent = resolve_artifact_file(deployment, str(pathlib.PurePosixPath(KIOSK_ENABLEMENT).parent),
+                                   entry, directory=True)
+    enabled = entry(parent + '/' + pathlib.PurePosixPath(KIOSK_ENABLEMENT).name)
+    if enabled is None or enabled[0] != 'symlink':
+        raise ValueError('image kiosk service is not enabled by a symlink')
+    enabled_file = file(KIOSK_ENABLEMENT)
+    units = set()
+    for name in ('/usr/lib/systemd/system/dd-kiosk-browser.service',
+                 '/lib/systemd/system/dd-kiosk-browser.service'):
+        try:
+            units.add(file(name))
+        except ValueError:
+            continue
+    if enabled_file not in units:
+        raise ValueError('image enabled kiosk service does not resolve to its unit')
+    service = read(enabled_file)
+    for setting in ('User=weston', 'StateDirectory=dd-kiosk-browser', 'Restart=always', 'After=weston.service'):
+        if setting not in service:
+            raise ValueError(f'image kiosk service lacks {setting}')
+    for name, settings in KIOSK_CONTENTS.items():
+        content = read(file(name))
+        if any(setting not in content for setting in settings):
+            raise ValueError(f'image kiosk policy differs from expected content: {name}')
+        if name == '/usr/bin/dd-kiosk-browser' and '--disable-gpu' in content:
+            raise ValueError('image kiosk launcher disables GPU acceleration')
+    policy = json.loads(read(file('/etc/chromium/policies/managed/dd-kiosk-browser.json')))
+    for name, value in CHROMIUM_POLICY.items():
+        if policy.get(name) != value:
+            raise ValueError(f'image Chromium policy {name} differs from kiosk contract')
+    verify_startup_environment(read(file('/etc/default/dd-kiosk-browser')), expected_url)
 
 
 def display_matches(paths, patterns):
@@ -125,7 +178,7 @@ def verify_compressed(path, opener, label):
         raise ValueError(f'{label} failed integrity check: {exc}') from exc
 
 
-def resolve_artifact_file(deployment, filename, entry, executable=False):
+def resolve_artifact_file(deployment, filename, entry, executable=False, directory=False):
     """Resolve a regular file inside its deployment, never against the host root."""
     pending = filename.lstrip('/').split('/')
     resolved = []
@@ -154,32 +207,23 @@ def resolve_artifact_file(deployment, filename, entry, executable=False):
             pending = target.split('/') + pending
         elif kind == 'directory':
             resolved.append(component)
-        elif kind == 'regular' and not pending and (not executable or mode & 0o111):
+        elif kind == 'regular' and not directory and not pending and (not executable or mode & 0o111):
             return name
         else:
             raise ValueError(f'OTA file is not a regular {"executable" if executable else "file"}: {name}')
+    if directory:
+        return '/'.join([deployment.rstrip('/'), *resolved])
     raise ValueError(f'OTA file resolves to a directory: {filename}')
 
 
 def verify_artifact_payload(deployment, entry, read, expected_url, paths):
-    resolved = {}
     for name in ARTIFACT_FILES:
-        resolved[name] = resolve_artifact_file(
+        resolve_artifact_file(
             deployment, name, entry, executable=name in ARTIFACT_EXECUTABLES)
-    units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
-             '/lib/systemd/system/dd-kiosk-browser.service')
-    for unit in units:
-        try:
-            resolve_artifact_file(deployment, unit, entry)
-            break
-        except ValueError:
-            continue
-    else:
-        raise ValueError(f'OTA deployment {deployment} missing valid dd-kiosk-browser.service')
-    verify_startup_environment(read(resolved['/etc/default/dd-kiosk-browser']), expected_url)
+    file = lambda name, executable=False: resolve_artifact_file(deployment, name, entry, executable)
+    verify_kiosk_policy(deployment, file, entry, read, expected_url)
     verify_display_payload(
-        lambda name, executable=False: resolve_artifact_file(deployment, name, entry, executable),
-        read, paths)
+        file, read, paths)
 
 
 def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
@@ -193,6 +237,7 @@ def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
             capture_output=True, text=True, check=False,
         )
 
+    @functools.cache
     def entries(image, directory):
         result = debugfs(image, f'ls -p {directory}')
         if result.returncode or 'File not found' in result.stderr:
@@ -203,12 +248,14 @@ def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
     def quote(name):
         return '"' + name.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
+    @functools.cache
     def read(image, name):
         contents = debugfs(image, f'cat {quote(name)}')
         if contents.returncode or contents.stderr.strip().splitlines()[1:]:
             raise ValueError(f'cannot read OTA file: {name}')
         return contents.stdout
 
+    @functools.cache
     def entry(image, name):
         result = debugfs(image, f'stat {quote(name)}')
         match = re.search(r'Type:\s+(\S+)\s+Mode:\s+([0-7]+)', result.stdout)
@@ -382,19 +429,20 @@ def verify_startup_environment(environment, expected_url):
             raise ValueError(f'kiosk environment requires {key}={value}')
 
 
+def rootfs_entry(name):
+    path = pathlib.Path(name)
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return None
+    kind = ('regular' if stat.S_ISREG(mode) else 'directory' if stat.S_ISDIR(mode)
+            else 'symlink' if stat.S_ISLNK(mode) else 'other')
+    return kind, mode, str(path.readlink()) if kind == 'symlink' else None
+
+
 def rootfs_file(rootfs, name, executable=False):
     """Return a real image file with image-rooted symlink semantics."""
-    def entry(name):
-        path = pathlib.Path(name)
-        try:
-            mode = path.lstat().st_mode
-        except FileNotFoundError:
-            return None
-        kind = ('regular' if stat.S_ISREG(mode) else 'directory' if stat.S_ISDIR(mode)
-                else 'symlink' if stat.S_ISLNK(mode) else 'other')
-        return kind, mode, str(path.readlink()) if kind == 'symlink' else None
-
-    return pathlib.Path(resolve_artifact_file(str(rootfs.resolve()), name, entry, executable))
+    return pathlib.Path(resolve_artifact_file(str(rootfs.resolve()), name, rootfs_entry, executable))
 
 
 def verify_jaguar_touch(rootfs):
@@ -408,92 +456,12 @@ def verify_jaguar_touch(rootfs):
 def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     verify_etnaviv_weston(rootfs)
     verify_jaguar_touch(rootfs)
-    context = rootfs_file(rootfs, '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf')
-    if 'Environment=DD_KIOSK_GLES2_COMPAT=1' not in context.read_text():
-        raise ValueError('rootfs lacks Screen ES2 Chromium compatibility policy')
-    required = (
-        'usr/bin/chromium',
-        'usr/bin/dd-kiosk-browser',
-        'usr/libexec/dd-kiosk-linker-guard',
-        'etc/default/dd-kiosk-browser',
-        'etc/chromium/policies/managed/dd-kiosk-browser.json',
-        'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
-        'etc/xdg/weston/weston-screen.ini',
-        'etc/systemd/system/weston.service.d/screen.conf',
-        'usr/share/dd-kiosk-browser/offline.html',
-        'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
-        'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
-    )
-    for path in required:
-        rootfs_file(rootfs, path)
-    unit_paths = (
-        '/lib/systemd/system/dd-kiosk-browser.service',
-        '/usr/lib/systemd/system/dd-kiosk-browser.service',
-    )
-    unit_path = None
-    for path in unit_paths:
-        try:
-            unit_path = rootfs_file(rootfs, path)
-            break
-        except ValueError:
-            continue
-    if unit_path is None:
-        raise ValueError('rootfs lacks dd-kiosk-browser.service')
-    service = unit_path.read_text()
-    if 'User=weston' not in service or 'StateDirectory=dd-kiosk-browser' not in service:
-        raise ValueError('rootfs kiosk service lacks Weston ownership or writable state')
-    if 'Restart=always' not in service or 'After=weston.service' not in service:
-        raise ValueError('rootfs kiosk service lacks restart or compositor ordering')
-    enabled = rootfs / 'etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
-    if not enabled.is_symlink():
-        raise ValueError('rootfs kiosk service is not enabled for startup')
-    if rootfs_file(rootfs, str(enabled.relative_to(rootfs))) != unit_path:
-        raise ValueError('rootfs enabled kiosk service does not resolve to its unit')
-    launcher = rootfs_file(rootfs, '/usr/bin/dd-kiosk-browser').read_text()
-    for flag in ('--ozone-platform=wayland', '--kiosk'):
-        if flag not in launcher:
-            raise ValueError(f'rootfs kiosk launcher lacks required Chromium flag {flag}')
-    if '--disable-gpu' in launcher:
-        raise ValueError('rootfs kiosk launcher disables GPU acceleration')
-    linker_guard = rootfs_file(rootfs, '/usr/libexec/dd-kiosk-linker-guard').read_text()
-    for contract in ('kiosk-audio-hotpatch.conf', 'zz-audio-hotpatch.conf',
-                     '/sbin/ldconfig', '/ostree/deploy/'):
-        if contract not in linker_guard:
-            raise ValueError(f'rootfs linker guard lacks migration contract {contract}')
-    native_runtime = rootfs_file(rootfs, '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf').read_text()
-    if 'UnsetEnvironment=LD_LIBRARY_PATH' not in native_runtime:
-        raise ValueError('rootfs kiosk runtime does not clear legacy library overrides')
-    weston_guard = rootfs_file(rootfs, '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf').read_text()
-    if 'ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard' not in weston_guard:
-        raise ValueError('rootfs Weston service does not gate mixed-deployment linkage')
-    verify_startup_url(rootfs, expected_url)
-    weston = rootfs_file(rootfs, '/etc/xdg/weston/weston-screen.ini').read_text()
-    if 'shell=kiosk-shell.so' not in weston:
-        raise ValueError('rootfs Weston config does not select kiosk shell')
-    if 'transform=rotate-90' not in weston:
-        raise ValueError('rootfs Weston config lacks candidate panel transform')
-    weston_service = rootfs_file(rootfs, '/etc/systemd/system/weston.service.d/screen.conf').read_text()
-    if '--config=/etc/xdg/weston/weston-screen.ini' not in weston_service:
-        raise ValueError('rootfs Weston service does not select candidate screen config')
-    policy_path = rootfs_file(rootfs, '/etc/chromium/policies/managed/dd-kiosk-browser.json')
-    policy = json.loads(policy_path.read_text())
-    expected_policy = {
-        'AllowFileSelectionDialogs': False,
-        'BrowserAddPersonEnabled': False,
-        'BrowserGuestModeEnabled': False,
-        'BrowserSignin': 0,
-        'DeveloperToolsAvailability': 2,
-        'DownloadRestrictions': 3,
-        'ExtensionInstallBlocklist': ['*'],
-        'IncognitoModeAvailability': 1,
-        'PrintingEnabled': False,
-        'URLBlocklist': ['view-source:*'],
-    }
-    for name, value in expected_policy.items():
-        if policy.get(name) != value:
-            raise ValueError(f'rootfs Chromium policy {name} does not match kiosk contract')
-    for executable in ARTIFACT_EXECUTABLES:
-        rootfs_file(rootfs, executable, executable=True)
+    for name in ARTIFACT_FILES:
+        rootfs_file(rootfs, name, executable=name in ARTIFACT_EXECUTABLES)
+    verify_kiosk_policy(
+        str(rootfs.resolve()),
+        lambda name, executable=False: rootfs_file(rootfs, name, executable),
+        rootfs_entry, lambda path: path.read_text(), expected_url)
     print(f'rootfs payload and kiosk service: verified at {rootfs}')
 
 

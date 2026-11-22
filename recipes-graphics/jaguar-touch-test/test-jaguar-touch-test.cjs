@@ -127,3 +127,27 @@ pointer('pointerup',510,410,51,surface,'touch');
 while (frames.length) frames.shift()();
 assert.equal(run('history.some(point => point.compatibilityId !== undefined)'),false);
 console.log('PASS: Chromium compatibility pointer/native input does not duplicate trails or erase mouse history');
+
+assert.equal(run('nativeSeen'),true);
+for (const pointerType of ['mouse','pen']) {
+    const beforeHistory = run('history.length');
+    const beforeX = run('view.x');
+    pointer('pointerdown',400,400,61,surface,pointerType);
+    assert.equal(run('activeContacts().size'),1,'real pointers remain active after native touch');
+    while (frames.length) frames.shift()();
+    assert.equal(run('Array.from(contactMarkers.values()).filter(nodes => nodes.marker.style.display !== "none").length'),1);
+    pointer('pointermove',450,400,61,surface,pointerType);
+    assert.equal(run('view.x'),beforeX+50,'real pointer gestures continue after native touch');
+    pointer('pointerup',450,400,61,surface,pointerType);
+    assert.equal(run('history.length'),beforeHistory+3,'real pointer trails continue after native touch');
+    assert.equal(run('activeContacts().size'),0);
+    while (frames.length) frames.shift()();
+}
+const beforeCompatibility = run('history.length');
+pointer('pointerdown',400,400,62,surface,'touch');
+pointer('pointermove',450,400,62,surface,'touch');
+pointer('pointerup',450,400,62,surface,'touch');
+assert.equal(run('history.length'),beforeCompatibility,'compatibility touch pointers remain suppressed');
+assert.equal(run('activeContacts().size'),0);
+while (frames.length) frames.shift()();
+console.log('PASS: mouse and pen trails, gestures and markers survive native-touch handoff');
