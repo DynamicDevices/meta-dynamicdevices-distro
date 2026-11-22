@@ -5,6 +5,9 @@
 # to gstreamer1.0-plugins-imx-meta and pulls the libimxvpuapi2/Hantro codec
 # integration.  Keep this opt-in so headless and e-ink images are not bloated.
 
+# Input policy belongs to the board, not to an optional Flutter demonstration.
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " jaguar-screen-touch"
+
 CORE_IMAGE_BASE_INSTALL += " \
     gstreamer1.0 \
     gstreamer1.0-plugins-base \

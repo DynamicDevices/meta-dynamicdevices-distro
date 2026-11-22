@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+# Run in the existing weston user's desktop session. The normal kiosk launcher
+# discovers its Wayland socket and retains the configured browser runtime.
+case "${1:-}" in
+    '') suffix= ;;
+    --gestures) suffix='?mode=gestures' ;;
+    *) echo "Usage: jaguar-touch-test [--gestures]" >&2; exit 2 ;;
+esac
+export DD_KIOSK_URL="file:///usr/share/jaguar-touch-test/index.html$suffix"
+exec /usr/bin/dd-kiosk-browser
