@@ -10,11 +10,13 @@ DISTRO = "lmp-dynamicdevices"
 
 The distro owns organisation-wide policy. Hardware facts stay in the BSP and
 `MACHINE_FEATURES`. Optional product software is selected with
-`DD_PRODUCT_FEATURES`. An empty product feature set is the headless/minimal
-default; `headless` is not itself a feature.
+`DD_PRODUCT_FEATURES`. Boards explicitly declaring `display-multimedia` default
+to the headed `display` bundle. Other machines remain minimal; an explicitly
+empty product feature set opts out of the display stack. `headless` is not
+itself a feature.
 
-The canonical distro removes graphical and host-audio features by default.
-Selecting `display`, `flutter`, `audio`, or `android-container` retains and
+Without a selected bundle, the canonical distro removes graphical and host-audio features.
+Selecting `display`, `flutter`, `kiosk-browser`, `audio`, or `android-container` retains and
 expands the corresponding runtime. CRA audit and automatic registration remain
 global shipped-product policy rather than product options.
 
@@ -26,6 +28,11 @@ global shipped-product policy rather than product options.
 | Physical capability | machine/BSP | display controller, panel, touch, audio codec, TPM, Wi-Fi chipset |
 | Product software | `DD_PRODUCT_FEATURES` | Wayland, Flutter, host audio, Android container |
 | Development access | `IMAGE_FEATURES` | `debug-tweaks`, profiling and test tools |
+
+For the display stack, Factory `DEV_MODE=1` adds `debug-tweaks` and permits
+Weston's `--debug` protocol for development-only capture and diagnosis. A PROD
+build omits that argument. Do not enable the debug protocol at runtime to make
+a production test harness work.
 
 Do not infer a full graphical stack merely because hardware has a display. An
 e-ink product may use its display directly without Wayland or OpenGL.
@@ -44,6 +51,9 @@ DD_PRODUCT_FEATURES = "display flutter godot"
 # Flutter screen
 DD_PRODUCT_FEATURES = "improv flutter"
 
+# Chromium kiosk screen with host audio
+DD_PRODUCT_FEATURES = "kiosk-browser audio"
+
 # Android screen; currently implemented by Waydroid
 DD_PRODUCT_FEATURES = "improv android-container"
 ```
@@ -52,6 +62,21 @@ Feature bundles expand prerequisites centrally. In particular,
 `display` enables the shipped screen stack (`wayland`, `opengl`, and
 `pipewire`) and the hardware multimedia image fragment. `flutter` and `godot`
 select their respective UI runtimes and also imply the display runtime.
+`kiosk-browser` selects Chromium Ozone Wayland and a Weston-owned fullscreen
+launcher, and also implies the display runtime. Its URL is configured in
+`/etc/default/dd-kiosk-browser`; generic products default to `https://active-esl.com`.
+Only Jaguar Screen defaults to the approved silent YouTube autoplay/loop page.
+On Jaguar Screen it selects Weston's kiosk shell, so other windows do not
+become part of the public display. Audio remains an explicit `audio` feature;
+select it for browser playback so Chromium is built with its audio backend and
+the ALSA/PulseAudio runtime is present.
+The kiosk package installs Chromium managed policies under
+`/etc/chromium/policies/managed`: public users cannot open file pickers,
+downloads, printing, Developer Tools, guest/incognito profiles, or install
+extensions. The policy file is a conffile for product-specific adjustments;
+physical keyboard and touch escape paths still require board testing.
+It cannot be combined with `flutter`, `godot`, or `android-container`, which
+are alternative owners of the same display.
 The lower-level `wayland` selector remains available for migration
 compatibility, but new product configurations should use `display`.
 `android-container` currently enables `waydroid`, `wayland`, `opengl`,
@@ -61,7 +86,7 @@ addition because the current Waydroid recipe declares it in
 configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
-The `display`, `flutter`, and `godot` selections require the BSP to declare
+The `display`, `flutter`, `godot`, and `kiosk-browser` selections require the BSP to declare
 `display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
 the machine while preventing capable hardware from implicitly installing a UI.
 
@@ -70,7 +95,17 @@ Runtime payloads are owned by provider-neutral packagegroups:
 - `packagegroup-dd-alsa`
 - `packagegroup-dd-audio`
 - `packagegroup-dd-flutter`
+- `packagegroup-dd-kiosk-browser`
 - `packagegroup-dd-android-container`
+
+`packagegroup-dd-kiosk-browser` installs `DD_KIOSK_BROWSER_RUNTIME`, which
+defaults to `dd-kiosk-browser`. That runtime package supplies the Chromium
+launcher and depends on `chromium-ozone-wayland`; a different browser runtime
+can replace it without changing the image hook or packagegroup.
+The manual Jaguar touch test follows the selected runtime's same-named launcher
+in `/usr/bin`. Set `DD_KIOSK_TEST_BROWSER` explicitly in build configuration when
+a provider uses a different executable name; a direct invocation can override
+the same variable. No alternate runtime is assumed to supply Chromium's launcher.
 
 The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is

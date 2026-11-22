@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Date: Thu, 17 Sep 2026 15:00:00 +0100
+Subject: [PATCH] bytemuck: drop removed LaneCount bound
+
+Rust removed core::simd::LaneCount and SupportedLaneCount in January 2026.
+Chromium's vendored bytemuck already has a post-removal implementation,
+but the pinned Yocto Rust build selected the older conditional branch and
+failed with E0425/E0405. Use the same bound as the post-removal branch in
+that older branch. This is limited to the kiosk's pinned Rust 1.98.1 build.
+
+Upstream-Status: Inappropriate [pinned Yocto Rust/Chromium integration]
+
+---
+ third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs      | 1 -
+ third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs b/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs
+--- a/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs
++++ b/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs
+@@ -153,5 +153,4 @@ unsafe impl<T, const N: usize> Pod for core::simd::Simd<T, N>
+ where
+   T: core::simd::SimdElement + Pod,
+-  core::simd::LaneCount<N>: core::simd::SupportedLaneCount,
+ {
+ }
+
+diff --git a/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs b/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs
+--- a/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs
++++ b/third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs
+@@ -232,5 +232,4 @@ unsafe impl<T, const N: usize> Zeroable for core::simd::Simd<T, N>
+ where
+   T: core::simd::SimdElement + Zeroable,
+-  core::simd::LaneCount<N>: core::simd::SupportedLaneCount,
+ {
+ }

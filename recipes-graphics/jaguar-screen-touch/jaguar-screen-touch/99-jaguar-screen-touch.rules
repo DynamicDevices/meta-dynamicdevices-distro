@@ -1,0 +1,3 @@
+# Jaguar uses native 600x1024 FT5x06 coordinates and inversion from device tree.
+# Weston owns output rotation. Do not duplicate these transforms in userspace.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="generic ft5x06*", ENV{WL_OUTPUT}="DSI-1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0"

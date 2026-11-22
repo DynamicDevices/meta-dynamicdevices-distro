@@ -5,6 +5,9 @@
 # to gstreamer1.0-plugins-imx-meta and pulls the libimxvpuapi2/Hantro codec
 # integration.  Keep this opt-in so headless and e-ink images are not bloated.
 
+# Input policy belongs to the board, not to an optional Flutter demonstration.
+CORE_IMAGE_BASE_INSTALL:append:imx8mm-jaguar-screen = " jaguar-screen-touch"
+
 CORE_IMAGE_BASE_INSTALL += " \
     gstreamer1.0 \
     gstreamer1.0-plugins-base \
@@ -19,13 +22,42 @@ CORE_IMAGE_BASE_INSTALL += " \
 # counter-clockwise from its native scan direction.  Apply that transform at
 # the compositor so every client (Flutter, Godot and video) shares the same
 # logical orientation; applications must not compensate independently.
-# Weston remains G2D accelerated, with a persistent runtime directory,
-# branded background and GPU access.
+# Weston uses GL with Etnaviv or G2D with the NXP stack, with a persistent
+# runtime directory, branded background and GPU access.
 configure_jaguar_screen_weston() {
+    # DRM card numbers change when Etnaviv probes. Select the display driver,
+    # never the render-only GPU or the early simple-framebuffer device.
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', 'true', 'false', d)}; then
+        install -d ${IMAGE_ROOTFS}${libexecdir}
+        cat > ${IMAGE_ROOTFS}${libexecdir}/dd-screen-weston <<'EOF'
+#!/bin/sh
+set -eu
+chosen=
+for candidate in /sys/class/drm/card[0-9]*; do
+    [ -e "$candidate/device/driver" ] || continue
+    case "$(readlink -f "$candidate/device/driver")" in
+        */imx-drm)
+            if [ -n "$chosen" ]; then
+                echo "Multiple imx-drm display controllers; refusing ambiguous selection" >&2
+                exit 1
+            fi
+            chosen=$(basename "$candidate")
+            ;;
+    esac
+done
+if [ -z "$chosen" ]; then
+    echo "No imx-drm display controller; refusing software/display fallback" >&2
+    exit 1
+fi
+exec /usr/bin/weston --drm-device="$chosen" "$@"
+EOF
+        chmod 0755 ${IMAGE_ROOTFS}${libexecdir}/dd-screen-weston
+    fi
     install -d ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston
     cat > ${IMAGE_ROOTFS}${sysconfdir}/xdg/weston/weston-screen.ini <<'EOF'
 [core]
-use-g2d=true
+${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'shell=kiosk-shell.so', '', d)}
+${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', 'use-g2d=false', 'use-g2d=true', d)}
 repaint-window=16
 idle-time=0
 
@@ -46,14 +78,35 @@ EOF
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf <<'EOF'
+[Unit]
+# Let the early DRM splash draw first, then stop it deterministically before
+# Weston opens the real display device.
+After=screen-splash.service
+Conflicts=screen-splash.service
+
 [Service]
 WorkingDirectory=/var/rootdirs/home/weston
 ExecStart=
 SupplementaryGroups=render video
 # Weston's debug extension authorises weston-screenshooter. Keep it strictly
 # tied to DEV_MODE/debug-tweaks so production images do not expose capture.
-ExecStart=/usr/bin/weston --config=/etc/xdg/weston/weston-screen.ini --use-g2d --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
+ExecStart=${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', d.getVar('libexecdir') + '/dd-screen-weston', '/usr/bin/weston', d)} --config=/etc/xdg/weston/weston-screen.ini ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--use-g2d', d)} ${@bb.utils.contains('DISTRO_FEATURES', 'etnaviv', '', '--drm-device=card1', d)} --modules=systemd-notify.so ${@bb.utils.contains('IMAGE_FEATURES', 'debug-tweaks', '--debug', '', d)} --log=/var/rootdirs/home/weston/weston.log
 EOF
+
+    # OSTree preserves locally modified /etc drop-ins. A later-sorting vendor
+    # drop-in carries the new kiosk command even when an old screen.conf still
+    # requests --use-g2d. Keep it in /usr so it follows deployment and rollback;
+    # copy the same generated command so the two launchers cannot diverge.
+    if ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser etnaviv', 'true', 'false', d)}; then
+        install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d
+        install -m 0644 ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/weston.service.d/screen.conf \
+            ${IMAGE_ROOTFS}${systemd_system_unitdir}/weston.service.d/zzzzzz-screen-etnaviv.conf
+        install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}/dd-kiosk-browser.service.d
+        cat > ${IMAGE_ROOTFS}${systemd_system_unitdir}/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf <<'EOF'
+[Service]
+Environment=DD_KIOSK_GLES2_COMPAT=1
+EOF
+    fi
 
     install -d ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d
     cat > ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/jaguar-screen-weston.conf <<'EOF'

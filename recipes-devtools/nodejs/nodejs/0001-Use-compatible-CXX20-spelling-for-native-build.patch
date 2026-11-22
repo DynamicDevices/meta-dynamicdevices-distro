@@ -1,0 +1,22 @@
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Subject: [PATCH] Use compatible C++20 spelling for native build
+
+GCC 10 supports C++20 as -std=gnu++2a but rejects -std=gnu++20.
+The spelling selects the same dialect and lets the Foundries native host
+compiler build Node 22's host tools.
+
+Upstream-Status: Inappropriate [Foundries host toolchain compatibility]
+
+diff --git a/common_node.gypi b/common_node.gypi
+index 590d932..bc9600a 100644
+--- a/common_node.gypi
++++ b/common_node.gypi
+@@ -4,7 +4,7 @@
+       # Override common.gypi config to use C++20 for Node.js core only.
+       ['OS in "linux freebsd openbsd solaris android aix os400 cloudabi"', {
+         'cflags_cc!': ['-std=gnu++17'],
+-        'cflags_cc': ['-std=gnu++20'],
++        'cflags_cc': ['-std=gnu++2a'],
+       }],
+       ['OS=="mac" and clang==1', {
+         'xcode_settings': {

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Jaguar touch and gesture test</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07111f;color:#f7f9fc;font:20px system-ui;touch-action:none;overscroll-behavior:none}
+body{background-image:linear-gradient(to right,#1b2c44 1px,transparent 1px),linear-gradient(to bottom,#1b2c44 1px,transparent 1px);background-size:calc(100vw / 12) calc(100vh / 8)}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;z-index:1}
+header{position:fixed;top:16px;left:24px;right:24px;pointer-events:none;text-shadow:0 2px 4px #000;z-index:2}
+h1{margin:0;font-size:30px}p{margin:6px 0}#count{font-size:38px;font-weight:bold;color:#ffe477}
+#slots{display:flex;gap:8px;margin:8px 0}#slots span{display:inline-block;width:42px;text-align:center;padding:6px;border:2px solid #7990ae;border-radius:8px;background:#101a2a}
+#status,#diagnostics{font:18px monospace}nav{position:fixed;bottom:16px;left:24px;display:flex;gap:12px;z-index:2}
+#instructions{max-width:1500px;font-size:21px}#gesture-status{font:bold 25px monospace;color:#58e8ff}
+button{font:20px system-ui;padding:12px 20px;border:2px solid #c7d5ee;border-radius:8px;background:#21334c;color:white;touch-action:manipulation}
+footer{position:fixed;bottom:20px;right:24px;pointer-events:none;font:17px monospace;z-index:2}
+#gesture-art{position:fixed;left:calc((100vw - min(80vw,1100px))/2);top:21vh;width:min(80vw,1100px);height:58vh;z-index:0;display:none;place-items:center;pointer-events:none;transform-origin:50% 50%}
+#gesture-art>svg{width:100%;max-height:58vh;overflow:visible}
+#gesture-art{will-change:transform}
+.contact-marker{position:fixed;left:0;top:0;width:96px;height:96px;pointer-events:none;z-index:1;will-change:transform}
+.contact-marker svg{width:96px;height:96px;overflow:visible}
+.contact-label{position:fixed;left:0;top:0;pointer-events:none;z-index:1;font:bold 24px monospace;white-space:nowrap;will-change:transform}
+body::after{content:'';position:fixed;inset:1.5px;border:3px solid white;pointer-events:none;z-index:1}
+.signal-flow{animation:signal-flow 18s linear infinite}.signal-return{animation:signal-flow 24s linear infinite reverse}
+.paused .motion{animation-play-state:paused}
+@keyframes signal-flow{to{stroke-dashoffset:-1200}}
+</style>
+</head>
+<body>
+<div id="gesture-art" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <defs>
+    <radialGradient id="target-glow"><stop stop-color="#20d6d2" stop-opacity=".14"/><stop offset="1" stop-color="#07111f" stop-opacity="0"/></radialGradient>
+    <linearGradient id="signal-colour"><stop stop-color="#20d6d2"/><stop offset=".6" stop-color="#7557ff"/><stop offset="1" stop-color="#b6f23b"/></linearGradient>
+  </defs>
+  <ellipse cx="640" cy="360" rx="620" ry="300" fill="url(#target-glow)"/>
+  <g fill="none" stroke="url(#signal-colour)">
+    <ellipse cx="640" cy="360" rx="570" ry="250" stroke-width="2" opacity=".25"/>
+    <ellipse class="motion signal-flow" cx="640" cy="360" rx="570" ry="250" stroke-width="5" stroke-dasharray="90 500" stroke-linecap="round"/>
+    <ellipse cx="640" cy="360" rx="520" ry="205" stroke-width="1" opacity=".2"/>
+    <ellipse class="motion signal-return" cx="640" cy="360" rx="520" ry="205" stroke-width="3" stroke-dasharray="20 270" stroke-linecap="round" opacity=".65"/>
+  </g>
+  <!-- Canonical Active-Edge lockup, unchanged inside this nested SVG.
+       Source: marketing-collateral/brand/lockups/active-edge-symbol-wordmark-lockup.svg -->
+  <svg x="180" y="240" width="920" height="240" viewBox="0 0 920 240" role="img" aria-label="Active-Edge Solutions lockup">
+    <rect width="920" height="240" fill="#07111F"/>
+    <g transform="translate(28,32) scale(1.0)">
+      <g transform="translate(110,88) scale(0.86) translate(-110,-88)">
+        <path d="M110 23.467L174.533 88L110 152.533L45.467 88L110 23.467Z" fill="#07111F" stroke="#F7F9FC" stroke-width="7.333"/>
+        <path d="M77 54.267L115.133 88L77 121.733M110.733 54.267L148.867 88L110.733 121.733" fill="none" stroke="url(#ae-edge-chevrons)" stroke-width="9.533"/>
+      </g>
+      <path d="M18.333 51.333C64.533 8.8 158.4 14.667 202.4 57.2M18.333 124.667C67.467 165.733 159.867 161.333 202.4 118.8" fill="none" stroke="url(#ae-edge-arcs)" stroke-width="5.867"/>
+      <path d="M27.667 51.333L18.333 42L9 51.333L18.333 60.667L27.667 51.333Z" fill="#20D6D2"/>
+      <path d="M211.734 118.8L202.4 109.466L193.066 118.8L202.4 128.134L211.734 118.8Z" fill="#B6F23B"/>
+    </g>
+    <text x="268" y="118" font-family="Sora, Sora ExtraBold, sans-serif" font-weight="800" font-size="64" fill="#F7F9FC" letter-spacing="1.5">ACTIVE-EDGE</text>
+    <text x="272" y="168" font-family="Space Grotesk, Space Grotesk Medium, sans-serif" font-weight="500" font-size="28" fill="#20D6D2" letter-spacing="6">SOLUTIONS</text>
+    <defs>
+      <linearGradient id="ae-edge-chevrons" x1="77" y1="54.267" x2="144.332" y2="125.99" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#20D6D2"/><stop offset="0.52" stop-color="#7557FF"/><stop offset="1" stop-color="#B6F23B"/>
+      </linearGradient>
+      <linearGradient id="ae-edge-arcs" x1="18.333" y1="22.215" x2="142.088" y2="196.121" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#20D6D2"/><stop offset="0.52" stop-color="#7557FF"/><stop offset="1" stop-color="#B6F23B"/>
+      </linearGradient>
+    </defs>
+  </svg>
+  <text x="640" y="535" text-anchor="middle" fill="#20d6d2" font-family="sans-serif" font-size="20" letter-spacing="5">EMBEDDED INTELLIGENCE. MADE REAL.</text>
+</svg>
+</div>
+<canvas id="screen"></canvas>
+<header>
+<h1 id="title">Jaguar · multitouch test</h1>
+<div id="count">0 contacts</div>
+<div id="slots" aria-label="Active contacts"></div>
+<p id="instructions">Start with ONE finger. Move it, then add fingers without lifting the first.</p>
+<p id="gesture-status"></p>
+<p id="status">Waiting for touch. Calibration is unchanged.</p>
+<p id="diagnostics"></p>
+</header>
+<nav><button id="mode">Gesture test</button><button id="reset">Reset view</button><button id="motion">Pause animation</button><button id="trails" aria-pressed="true">Hide trails</button><button id="clear">Clear trails</button><button id="full">Full screen</button></nav>
+<footer id="info"></footer>
+<script>
+'use strict';
+const canvas = document.querySelector('#screen');
+const ctx = canvas.getContext('2d');
+const gestureArt = document.querySelector('#gesture-art');
+const gestureSvg = gestureArt.querySelector(':scope > svg');
+const contactMarkers = new Map();
+const textNodes = new Map();
+let lastUiAt = -Infinity, lastUiKey = '', uiTimer = 0, framePending = false;
+function setText(selector, value) {
+    let node = textNodes.get(selector);
+    if (!node) { node = document.querySelector(selector); textNodes.set(selector, node); }
+    if (node.textContent !== value) node.textContent = value;
+}
+function scheduleRender() {
+    if (framePending) return;
+    framePending = true;
+    requestAnimationFrame(() => { framePending = false; render(); });
+}
+function renderMarkers(active, enabled) {
+    const visible = new Set();
+    if (enabled) for (const point of active.values()) {
+        visible.add(point.slot);
+        let nodes = contactMarkers.get(point.slot);
+        if (!nodes) {
+            const marker = document.createElement('div'), label = document.createElement('span');
+            marker.className = 'contact-marker'; label.className = 'contact-label';
+            marker.innerHTML = '<svg viewBox="0 0 96 96" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="5"><circle cx="48" cy="48" r="30"/><path d="M0 48H96M48 0V96"/></g></svg>';
+            document.body.appendChild(marker); document.body.appendChild(label);
+            nodes = {marker, label}; contactMarkers.set(point.slot, nodes);
+        }
+        nodes.marker.style.display = ''; nodes.label.style.display = '';
+        nodes.marker.style.color = point.colour; nodes.label.style.color = point.colour;
+        nodes.marker.style.transform = 'translate('+(point.x-48)+'px,'+(point.y-48)+'px)';
+        nodes.label.style.transform = 'translate('+Math.max(8,Math.min(width-250,point.x+36))+'px,'+
+            (Math.max(260,Math.min(height-80,point.y-36))-24)+'px)';
+        const label = '#'+(point.slot+1)+' '+Math.round(point.x)+','+Math.round(point.y);
+        if (nodes.label.textContent !== label) nodes.label.textContent = label;
+    }
+    for (const [slot, nodes] of contactMarkers) if (!visible.has(slot)) {
+        nodes.marker.style.display = 'none'; nodes.label.style.display = 'none';
+    }
+}
+const colours = ['#ffdf53','#58e8ff','#ff80ba','#9dff77','#c8a3ff',
+                 '#ff9c5e','#5affbd','#f5b8ff','#c9ed62','#99c9ff'];
+let touches = new Map();
+const pointers = new Map();
+const history = [];
+const counters = {touchstart:0,touchmove:0,touchend:0,touchcancel:0,
+                  pointerdown:0,pointermove:0,pointerup:0,pointercancel:0};
+let width = 0, height = 0, maximum = 0, nativeSeen = false;
+let mode = new URLSearchParams(location.search).get('mode') === 'gestures' ? 'gestures' : 'contacts';
+const trailVisibility = {contacts:true, gestures:false};
+const view = {scale:1, x:0, y:0};
+let gesture = null;
+let motionPaused = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+let last = 'Waiting for touch. Calibration is unchanged.';
+const slotElements = colours.map((colour, index) => {
+    const element = document.createElement('span');
+    element.textContent = String(index + 1);
+    document.querySelector('#slots').appendChild(element);
+    return element;
+});
+
+function newPoint(map) {
+    const used = new Set(Array.from(map.values(), point => point.slot));
+    let slot = 0;
+    while (used.has(slot)) slot++;
+    return {slot, colour:colours[slot % colours.length], x:0, y:0};
+}
+
+function remember(point, down) {
+    history.push({...point, down});
+    if (history.length > 5000) history.splice(0, history.length - 5000);
+}
+
+function updateGesture() {
+    if (mode !== 'gestures') return;
+    const source = nativeSeen ? 'native' : 'pointer';
+    const active = nativeSeen ? touches : pointers;
+    const points = Array.from(active.entries()).sort((a,b)=>a[1].slot-b[1].slot).slice(0,2);
+    if (!points.length) { gesture = null; return; }
+    const first = points[0][1], second = points[1]?.[1];
+    const mid = second ? {x:(first.x+second.x)/2,y:(first.y+second.y)/2} : first;
+    const distance = second ? Math.hypot(first.x-second.x,first.y-second.y) : 0;
+    const key = source+':'+points.map(point=>point[0]).join(',');
+    if (!gesture || gesture.key !== key) {
+        gesture = {key, distance, startScale:view.scale,
+                   anchorX:(mid.x-width/2-view.x)/view.scale,
+                   anchorY:(mid.y-height/2-view.y)/view.scale};
+        return;
+    }
+    if (second && gesture.distance > 1)
+        view.scale = Math.max(.25,Math.min(8,gesture.startScale*distance/gesture.distance));
+    view.x = mid.x-width/2-gesture.anchorX*view.scale;
+    view.y = mid.y-height/2-gesture.anchorY*view.scale;
+}
+
+function render() {
+    const active = nativeSeen ? touches : pointers;
+    maximum = Math.max(maximum, active.size);
+    const needsCanvas = mode === 'contacts' || (trailVisibility[mode] && history.length > 0);
+    renderMarkers(active, mode === 'gestures' && !needsCanvas);
+    canvas.style.display = needsCanvas ? 'block' : 'none';
+    if (needsCanvas) {
+    ctx.clearRect(0, 0, width, height);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#344763';
+    for (let x = 0; mode === 'contacts' && x <= width; x += width / 12) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    }
+    for (let y = 0; mode === 'contacts' && y <= height; y += height / 8) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    ctx.strokeRect(3, 3, width - 6, height - 6);
+    for (const fy of mode === 'contacts' ? [.25,.55,.82] : []) for (const fx of [.1,.5,.9]) {
+        const x = width * fx, y = height * fy;
+        ctx.strokeStyle = '#9ab5d9'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x,y,28,0,Math.PI*2);
+        ctx.moveTo(x-40,y); ctx.lineTo(x+40,y);
+        ctx.moveTo(x,y-40); ctx.lineTo(x,y+40); ctx.stroke();
+    }
+    for (const point of trailVisibility[mode] ? history : []) {
+        ctx.fillStyle = point.colour;
+        ctx.beginPath(); ctx.arc(point.x,point.y,point.down?10:4,0,Math.PI*2); ctx.fill();
+    }
+    for (const point of active.values()) {
+        ctx.strokeStyle = point.colour; ctx.fillStyle = point.colour; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(point.x,point.y,30,0,Math.PI*2);
+        ctx.moveTo(point.x-48,point.y); ctx.lineTo(point.x+48,point.y);
+        ctx.moveTo(point.x,point.y-48); ctx.lineTo(point.x,point.y+48); ctx.stroke();
+        ctx.font = 'bold 24px monospace';
+        ctx.fillText('#'+(point.slot+1)+' '+Math.round(point.x)+','+Math.round(point.y),
+                     Math.max(8,Math.min(width-250,point.x+36)),
+                     Math.max(260,Math.min(height-80,point.y-36)));
+    }
+    }
+    gestureArt.style.display = mode === 'gestures' ? 'grid' : 'none';
+    gestureArt.style.transform = 'translate('+view.x+'px,'+view.y+'px) scale('+view.scale+')';
+    gestureArt.className = motionPaused || active.size > 0 ? 'paused' : '';
+    const now = performance.now();
+    const uiKey = [mode,motionPaused,trailVisibility[mode],active.size,maximum,nativeSeen].join(':');
+    if (uiKey === lastUiKey && now-lastUiAt < 150) {
+        if (!uiTimer) uiTimer = setTimeout(() => { uiTimer = 0; render(); },150-(now-lastUiAt));
+        return;
+    }
+    if (uiTimer) { clearTimeout(uiTimer); uiTimer = 0; }
+    lastUiKey = uiKey; lastUiAt = now;
+    for (let index = 0; index < slotElements.length; index++) {
+        const present = Array.from(active.values()).some(point => point.slot === index);
+        slotElements[index].style.backgroundColor = present ? colours[index] : '#101a2a';
+        slotElements[index].style.color = present ? '#101a2a' : '#fff';
+    }
+    setText('#count', active.size+' contact'+(active.size===1?'':'s')+' · peak '+maximum);
+    setText('#title', mode === 'gestures' ? 'Jaguar · gesture test' : 'Jaguar · multitouch test');
+    setText('#mode', mode === 'gestures' ? 'Contact test' : 'Gesture test');
+    document.querySelector('#reset').style.display = mode === 'gestures' ? '' : 'none';
+    document.querySelector('#motion').style.display = mode === 'gestures' ? '' : 'none';
+    setText('#motion', motionPaused ? 'Play animation' : 'Pause animation');
+    setText('#trails', trailVisibility[mode] ? 'Hide trails' : 'Show trails');
+    document.querySelector('#trails').ariaPressed = String(trailVisibility[mode]);
+    setText('#instructions', mode === 'gestures'
+        ? '1. Drag the Active-Edge artwork with ONE finger.  2. Add a second finger: spread to zoom in, pinch to zoom out.  3. Move both together to pan.  4. Lift one to continue dragging. Reset view returns to 100%. Show/Hide trails controls past marks, not live contacts. Rings pause while touching, then resume unless Pause animation is selected.'
+        : '1. Move ONE finger: expect one marker and a trail when enabled.  2. Keep it down and add fingers: each gets a number and colour.  3. Lift them individually: count must return to zero. Try all edges and corners. Show/Hide trails controls past marks; Gesture test opens pinch/pan.');
+    setText('#gesture-status', mode === 'gestures'
+        ? 'Zoom '+Math.round(view.scale*100)+'% · pan '+Math.round(view.x)+', '+Math.round(view.y)+' px · app gestures, not browser page zoom'
+        : '');
+    setText('#status', last);
+    setText('#diagnostics',
+        'Native: '+touches.size+' active, '+counters.touchstart+' starts, '+counters.touchmove+' moves, '+counters.touchcancel+' cancels | '+
+        'Pointer: '+pointers.size+' active, '+counters.pointerdown+' starts, '+counters.pointermove+' moves, '+counters.pointercancel+' cancels');
+    setText('#info', width+' × '+height+' CSS px · '+(nativeSeen?'native touch':'pointer input'));
+}
+
+function onTouch(event) {
+    const contacts = Array.from(event.touches).filter(contact =>
+        touches.has(contact.identifier) || !(contact.target || event.target).closest?.('button,nav'));
+    if (!touches.size && !contacts.length) return;
+    if (!event.target.closest?.('button,nav')) event.preventDefault();
+    nativeSeen = true;
+    counters[event.type]++;
+    const next = new Map();
+    // Rebuild from every event's complete contact set: no pointerdown prerequisite.
+    for (const contact of contacts) {
+        if (touches.has(contact.identifier)) next.set(contact.identifier, touches.get(contact.identifier));
+    }
+    for (const contact of contacts) {
+        const point = next.get(contact.identifier) || newPoint(next);
+        point.x = contact.clientX; point.y = contact.clientY;
+        next.set(contact.identifier, point);
+    }
+    for (const contact of Array.from(event.changedTouches)) {
+        const point = next.get(contact.identifier) || touches.get(contact.identifier);
+        if (!point) continue;
+        point.x = contact.clientX; point.y = contact.clientY;
+        remember(point, event.type === 'touchstart');
+        last = event.type+' #'+(point.slot+1)+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
+    }
+    touches = next;
+    updateGesture();
+    scheduleRender();
+}
+
+function onPointer(event) {
+    counters[event.type]++;
+    let point = pointers.get(event.pointerId);
+    if (event.type === 'pointerdown') {
+        point = newPoint(pointers);
+        pointers.set(event.pointerId, point);
+    }
+    if (point) {
+        point.x = event.clientX; point.y = event.clientY;
+        if (!nativeSeen) remember(point, event.type === 'pointerdown');
+        if (event.type === 'pointerup' || event.type === 'pointercancel') pointers.delete(event.pointerId);
+        if (!nativeSeen) last = (event.pointerType||'pointer')+' '+event.type+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
+    }
+    // Do not cancel pointerdown: preserve Chromium's native touch event delivery.
+    if (!nativeSeen) updateGesture();
+    scheduleRender();
+}
+
+for (const type of ['touchstart','touchmove','touchend','touchcancel'])
+    document.addEventListener(type, onTouch, {capture:true,passive:false});
+for (const type of ['pointerdown','pointermove','pointerup','pointercancel'])
+    document.addEventListener(type, event => {
+        if (type === 'pointerdown' && event.target.closest?.('button,nav')) return;
+        if (type !== 'pointerdown' && !pointers.has(event.pointerId)) return;
+        onPointer(event);
+    }, {capture:true});
+
+function clear() {
+    touches.clear(); pointers.clear(); history.length = 0; maximum = 0; nativeSeen = false;
+    gesture = null;
+    for (const type of Object.keys(counters)) counters[type] = 0;
+    last = 'Cleared. Start with ONE finger, then add fingers.';
+    render();
+}
+function resize() {
+    width = innerWidth; height = innerHeight;
+    const scale = devicePixelRatio || 1;
+    canvas.width = Math.round(width*scale); canvas.height = Math.round(height*scale);
+    ctx.setTransform(scale,0,0,scale,0,0); resetView(); clear();
+}
+function resetView() { view.scale=1; view.x=0; view.y=0; gesture=null; render(); }
+function setMode(next) { mode=next; clear(); resetView(); }
+document.querySelector('#mode').onclick = () => setMode(mode === 'contacts' ? 'gestures' : 'contacts');
+document.querySelector('#reset').onclick = resetView;
+document.querySelector('#motion').onclick = () => { motionPaused=!motionPaused; render(); };
+document.querySelector('#trails').onclick = () => { trailVisibility[mode]=!trailVisibility[mode]; render(); };
+document.querySelector('#clear').onclick = clear;
+document.querySelector('#full').onclick = () => document.documentElement.requestFullscreen().catch(()=>{});
+document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='c') clear();});
+addEventListener('resize',resize);
+resize();
+</script>
+</body>
+</html>

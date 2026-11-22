@@ -6,7 +6,6 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 SRC_URI = " \
     file://screen-flutter-demo.service \
     file://screen-flutter-demo \
-    file://99-jaguar-screen-touch.rules \
 "
 
 S = "${WORKDIR}"
@@ -21,6 +20,7 @@ SYSTEMD_AUTO_ENABLE:${PN} = "disable"
 RDEPENDS:${PN} = " \
     ivi-homescreen \
     ivi-homescreen-multi-touch-test \
+    jaguar-screen-touch \
 "
 
 do_install() {
@@ -31,11 +31,6 @@ do_install() {
     install -m 0644 ${WORKDIR}/screen-flutter-demo.service \
         ${D}${systemd_system_unitdir}/screen-flutter-demo.service
 
-    install -d ${D}${sysconfdir}/udev/rules.d
-    install -m 0644 ${WORKDIR}/99-jaguar-screen-touch.rules \
-        ${D}${sysconfdir}/udev/rules.d/99-jaguar-screen-touch.rules
 }
-
-FILES:${PN} += "${sysconfdir}/udev/rules.d/99-jaguar-screen-touch.rules"
 
 COMPATIBLE_MACHINE = "^imx8mm-jaguar-screen$"

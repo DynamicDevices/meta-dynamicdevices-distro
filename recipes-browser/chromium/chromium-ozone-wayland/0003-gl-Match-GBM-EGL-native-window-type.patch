@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Dynamic Devices <engineering@dynamicdevices.co.uk>
+Date: Thu, 17 Sep 2026 18:30:00 +0100
+Subject: [PATCH] LEGACY ONLY: implementation-only GBM native window override
+
+Do not apply this patch. Retained only so do_compile can reverse it on source
+trees left by earlier builds, without invalidating do_unpack and all objects.
+
+On Chromium 147, Wayland callers select intptr_t through USE_OZONE. Including
+gbm.h only in the core GL implementation instead selects void*, producing a
+different NativeViewGLSurfaceEGL constructor symbol. Target 3008 failed to link
+the caller's expected long constructor. Fresh trees must retain the upstream
+include order; reused trees must remove this override and rebuild that object.
+
+Upstream-Status: Inappropriate [i.MX Wayland GBM product configuration]
+
+---
+ ui/gl/gl_surface_egl.cc | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/ui/gl/gl_surface_egl.cc b/ui/gl/gl_surface_egl.cc
+index abcd123..abcd124 100644
+--- a/ui/gl/gl_surface_egl.cc
++++ b/ui/gl/gl_surface_egl.cc
+@@ -5 +5,3 @@
++#include <gbm.h>
++
+ #include "ui/gl/gl_surface_egl.h"
