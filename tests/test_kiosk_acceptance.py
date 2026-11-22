@@ -1,6 +1,10 @@
 """Check the image acceptance contract with controlled filesystem fixtures."""
 import importlib.util
+import gzip
 from pathlib import Path
+import shutil
+import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -11,6 +15,78 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class KioskAcceptanceTests(unittest.TestCase):
+    def make_deployment(self, root, deployment, case):
+        checkout = root / deployment
+        for name in (*VERIFY.ARTIFACT_FILES,
+                     '/usr/lib/systemd/system/dd-kiosk-browser.service'):
+            path = checkout / name.lstrip('/')
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('fixture')
+        launcher = checkout / 'usr/bin/jaguar-touch-test'
+        launcher.chmod(0o755)
+        if case == 'regular':
+            return
+        launcher.unlink()
+        if case == 'directory':
+            launcher.mkdir()
+        elif case == 'non-executable':
+            launcher.write_text('fixture')
+            launcher.chmod(0o644)
+        else:
+            target = checkout / 'usr/libexec/touch-launcher'
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('fixture')
+            target.chmod(0o644 if case == 'symlink-non-executable' else 0o755)
+            if case == 'symlink-directory':
+                target.unlink()
+                target.mkdir()
+            link = {
+                'relative': '../libexec/touch-launcher',
+                'absolute': '/usr/libexec/touch-launcher',
+                'broken': '../libexec/missing',
+                'cycle': 'jaguar-touch-test',
+                'escape': '../../../outside',
+                'symlink-non-executable': '../libexec/touch-launcher',
+                'symlink-directory': '../libexec/touch-launcher',
+                'long': '../libexec/' + 'long-' * 20,
+            }[case]
+            if case == 'long':
+                target.rename(checkout / 'usr/libexec' / ('long-' * 20))
+            launcher.symlink_to(link)
+
+    def test_shipped_tar_and_ext4_require_executable_touch_launcher(self):
+        deployments = {'ostree/deploy/test/deploy/good.0',
+                       'ostree/deploy/test/deploy/candidate.1'}
+        for case in ('regular', 'relative', 'absolute', 'long', 'directory',
+                     'non-executable', 'broken', 'cycle', 'escape',
+                     'symlink-non-executable', 'symlink-directory'):
+            for artifact in ('tar', 'ext4'):
+                with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory) / 'root'
+                    self.make_deployment(root, 'ostree/deploy/test/deploy/good.0', 'regular')
+                    self.make_deployment(root, 'ostree/deploy/test/deploy/candidate.1', case)
+                    path = Path(directory) / ('ota.tar.xz' if artifact == 'tar' else 'ota.ext4.gz')
+                    if artifact == 'tar':
+                        with tarfile.open(path, 'w:xz') as archive:
+                            archive.add(root, arcname='.')
+                        check = lambda: VERIFY.verify_ota_tar(path, deployments)
+                    else:
+                        image = Path(directory) / 'ota.ext4'
+                        with image.open('wb') as output:
+                            output.truncate(16 * 1024 * 1024)
+                        subprocess.run(['mkfs.ext4', '-q', '-F', '-d', str(root), str(image)],
+                                       check=True, capture_output=True)
+                        with image.open('rb') as source, gzip.open(path, 'wb') as output:
+                            shutil.copyfileobj(source, output)
+                        check = lambda: VERIFY.verify_ota_ext4(path)
+                    if case in ('regular', 'relative', 'absolute', 'long'):
+                        result = check()
+                        if artifact == 'ext4':
+                            self.assertEqual(result, deployments)
+                    else:
+                        with self.assertRaises(ValueError):
+                            check()
+
     def test_jaguar_and_custom_startup_urls(self):
         for url in (VERIFY.JAGUAR_START_URL, 'https://example.com/start?a=1&b=2'):
             with self.subTest(url=url), tempfile.TemporaryDirectory() as directory:
