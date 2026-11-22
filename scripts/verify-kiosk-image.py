@@ -201,8 +201,15 @@ def verify_effective_kiosk_unit(deployment, file, entry, read, listdir, unit):
                 result.extend(shlex.split(value))
         return result
     for key, value in {'User': 'weston', 'Group': 'weston',
-                       'Restart': 'always', 'Type': 'simple'}.items():
+                       'Restart': 'always', 'RestartSec': '3', 'Type': 'simple'}.items():
         scalar('Service', key, value)
+    scalar('Unit', 'StartLimitIntervalSec', '0')
+    wants = {'weston.service'}
+    if any(pathlib.PurePosixPath(path).name == 'audio.conf' for path in optional):
+        wants.add('pulseaudio.service')
+    if set(words('Unit', 'Wants')) != wants or set(words('Unit', 'Conflicts')) != {
+            'screen-aero-demo.service', 'screen-flutter-demo.service'}:
+        raise ValueError('image kiosk service has incorrect effective Wants/Conflicts')
     for key, value in {'ExecStart': ['/usr/bin/dd-kiosk-browser'],
                        'StateDirectory': ['dd-kiosk-browser'],
                        'EnvironmentFile': ['-/etc/default/dd-kiosk-browser']}.items():
@@ -249,6 +256,7 @@ def verify_kiosk_policy(deployment, file, entry, read, expected_url, listdir):
     if enabled_file not in units:
         raise ValueError('image enabled kiosk service does not resolve to its unit')
     verify_effective_kiosk_unit(deployment, file, entry, read, listdir, enabled_file)
+    verify_touch_policy(file, read)
     for name, settings in KIOSK_CONTENTS.items():
         content = read(file(name))
         if any(setting not in content for setting in settings):
@@ -258,13 +266,39 @@ def verify_kiosk_policy(deployment, file, entry, read, expected_url, listdir):
             if len(commands) != 1:
                 raise ValueError('image kiosk launcher lacks a unique Chromium exec')
             arguments = shlex.split(commands[0], comments=True)
-            if not {'--ozone-platform=wayland', '--kiosk'} <= set(arguments) or '--disable-gpu' in arguments:
+            forbidden = {'--disable-gpu', '--no-sandbox', '--disable-web-security',
+                         '--allow-file-access-from-files'}
+            ozone = [arg for arg in arguments if arg.split('=', 1)[0] == '--ozone-platform']
+            if ('--kiosk' not in arguments or ozone != ['--ozone-platform=wayland'] or
+                    any(arg.split('=', 1)[0] in forbidden for arg in arguments)):
                 raise ValueError('image kiosk launcher has incorrect active GPU/kiosk flags')
     policy = json.loads(read(file('/etc/chromium/policies/managed/dd-kiosk-browser.json')))
+    if not isinstance(policy, dict) or policy.keys() != CHROMIUM_POLICY.keys():
+        raise ValueError('image Chromium policy must have exactly the qualified policy keys')
     for name, value in CHROMIUM_POLICY.items():
-        if policy.get(name) != value:
+        if type(policy[name]) is not type(value) or policy[name] != value:
             raise ValueError(f'image Chromium policy {name} differs from kiosk contract')
     verify_startup_environment(read(file('/etc/default/dd-kiosk-browser')), expected_url)
+
+
+def verify_touch_policy(file, read):
+    """Qualify installed touch policy, not just source or file presence."""
+    def active(content):
+        return [line.strip() for line in content.splitlines()
+                if line.strip() and not line.lstrip().startswith('#')]
+    rule = 'SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="generic ft5x06*", ENV{WL_OUTPUT}="DSI-1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0"'
+    if active(read(file(JAGUAR_TOUCH_FILES[0]))) != [rule]:
+        raise ValueError('image Jaguar touch rule differs from FT5x06/DSI-1/identity policy')
+    launcher = active(read(file('/usr/bin/jaguar-touch-test')))
+    expected = ['set -eu', 'case "${1:-}" in', "'') suffix= ;;",
+                "--gestures) suffix='?mode=gestures' ;;",
+                '*) echo "Usage: jaguar-touch-test [--gestures]" >&2; exit 2 ;;',
+                'esac', 'export DD_KIOSK_URL="file:///usr/share/jaguar-touch-test/index.html$suffix"',
+                'export DD_KIOSK_GLES2_COMPAT="${DD_KIOSK_GLES2_COMPAT:-1}"']
+    fallback = r'exec "\$\{DD_KIOSK_TEST_BROWSER:-/(?:[^\\$`"}\n]|\\[\\$`"}])*\}"'
+    if (launcher[:-1] != expected or not launcher or
+            re.fullmatch(fallback, launcher[-1]) is None):
+        raise ValueError('image Jaguar touch launcher differs from page/GLES2 policy')
 
 
 def display_matches(paths, patterns):

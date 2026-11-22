@@ -1,6 +1,7 @@
 """Local launcher regression tests; no device, browser or network required."""
 
 import os
+import importlib.util
 import re
 from pathlib import Path
 import socket
@@ -19,6 +20,9 @@ class KioskStartupTests(unittest.TestCase):
         helper = recipe[recipe.index('def jaguar_browser_replacement(d):'):recipe.index('\ndo_install()')]
         namespace = {}
         exec(helper, namespace)
+        spec = importlib.util.spec_from_file_location('verify_kiosk_image', ROOT.parents[1] / 'scripts/verify-kiosk-image.py')
+        verifier = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verifier)
         install = recipe.split('do_install() {\n', 1)[1].split('\n}', 1)[0]
         with tempfile.TemporaryDirectory(prefix='touch-recipe-') as directory:
             work = Path(directory)
@@ -43,6 +47,11 @@ class KioskStartupTests(unittest.TestCase):
                                             text=True, timeout=5)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout, 'exact browser reached\n')
+                    payload = {
+                        '/usr/bin/jaguar-touch-test': work / 'image/usr/bin/jaguar-touch-test',
+                        verifier.JAGUAR_TOUCH_FILES[0]: ROOT.parent / 'jaguar-screen-touch/jaguar-screen-touch/99-jaguar-screen-touch.rules',
+                    }
+                    verifier.verify_touch_policy(payload.__getitem__, lambda path: path.read_text())
 
     def launch(self, **settings):
         with tempfile.TemporaryDirectory(prefix="kiosk-startup-") as directory:

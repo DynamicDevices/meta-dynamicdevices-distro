@@ -92,6 +92,15 @@ drop-ins; other kiosk overrides (including global, dash-prefix, generated,
 runtime or administrator units/drop-ins) fail closed until qualified. It does
 not claim to implement every systemd directive. Configured touch-test browser
 paths are escaped for both the installed shell launcher and sed replacement.
+Acceptance requires the exact Chromium policy key set and JSON value types;
+extra allowlists cannot override the blocked URLs. Launcher checks reject GPU,
+sandbox and web-security disabling switches, including `--switch=value` forms,
+and require one unambiguous Wayland platform selection. Installed touch rules
+must retain FT5x06, DSI-1 and identity calibration, and the touch launcher must
+retain its local diagnostic URL and GLES2 default. Chromium builds retain the
+established 16-job limit for the approximately 65-GiB Foundries worker; live
+build diagnostics remain enabled. These checks do not constitute a new build
+or hardware acceptance run.
 It also checks the WIC boot FAT and compares the WIC root partition byte for
 byte with the verified OTA ext4. Inspect the actual boot files and
 test both installation paths before hardware acceptance.

@@ -23,8 +23,9 @@ CXXFLAGS:append:dd-graphics-imxg2d = " -include gbm.h"
 DD_CHROMIUM_LEGACY_GBM_PATCH := "${THISDIR}/${PN}/0003-gl-Match-GBM-EGL-native-window-type.patch"
 do_compile[file-checksums] += "${DD_CHROMIUM_LEGACY_GBM_PATCH}:True"
 
-# Inherit PARALLEL_MAKE from the build configuration rather than imposing a
-# Chromium-specific job count. Retain live build diagnostics and resource logs.
+# Chromium linking exceeds the Foundries worker's memory at its 44-CPU default
+# (about 65 GiB RAM). Retain the established conservative 16-job bound.
+PARALLEL_MAKE = "-j 16"
 
 # Send diagnostics through BitBake's live FIFO instead of waiting for its
 # failure-log dump. Keep ordinary Ninja progress in the complete task log.

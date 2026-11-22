@@ -35,6 +35,10 @@ class KioskAcceptanceTests(unittest.TestCase):
             path.write_text('fixture')
             path.chmod(0o755 if name in VERIFY.ARTIFACT_EXECUTABLES else 0o644)
         (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
+        (checkout / VERIFY.JAGUAR_TOUCH_FILES[0].lstrip('/')).write_text(
+            (ROOT / 'recipes-graphics/jaguar-screen-touch/jaguar-screen-touch/99-jaguar-screen-touch.rules').read_text())
+        touch_source = (ROOT / 'recipes-graphics/jaguar-touch-test/jaguar-touch-test/jaguar-touch-test').read_text()
+        (checkout / 'usr/bin/jaguar-touch-test').write_text(touch_source)
         for name, settings in VERIFY.KIOSK_CONTENTS.items():
             (checkout / name.lstrip('/')).write_text(
                 ('[Service]\n' if name.endswith('.conf') else '') + '\n'.join(settings) + '\n')
@@ -68,7 +72,7 @@ class KioskAcceptanceTests(unittest.TestCase):
         else:
             target = checkout / 'usr/libexec/touch-launcher'
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text('fixture')
+            target.write_text(touch_source)
             target.chmod(0o644 if case == 'symlink-non-executable' else 0o755)
             if case == 'symlink-directory':
                 target.unlink()
@@ -130,13 +134,14 @@ class KioskAcceptanceTests(unittest.TestCase):
                         for deployment in self.DEPLOYMENTS:
                             self.make_deployment(root, deployment, 'regular')
                         path = root / 'ostree/deploy/test/deploy/candidate.1' / name.lstrip('/')
+                        content = path.read_text()
                         path.unlink()
                         if kind == 'directory':
                             path.mkdir()
                         elif kind == 'broken-link':
                             path.symlink_to('missing')
                         else:
-                            path.with_name('actual-payload').write_text('fixture')
+                            path.with_name('actual-payload').write_text(content)
                             path.symlink_to('actual-payload')
                         if kind == 'valid-link':
                             self.check_artifact(root, directory, artifact)
@@ -228,7 +233,12 @@ class KioskAcceptanceTests(unittest.TestCase):
                      'dropin-user', 'global-dropin', 'prefix-dropin', 'runtime-dropin',
                      'admin-unit', 'commented-context', 'later-context', 'reset-unset',
                      'valid-audio', 'valid-reset', 'dropin-wrong-exec',
-                     'later-restart', 'unqualified-env', 'escaped-context'):
+                     'later-restart', 'unqualified-env', 'escaped-context',
+                     'policy-integer-bool', 'policy-bool-integer', 'policy-extra',
+                     'policy-list', 'policy-null', 'gpu-equals', 'no-sandbox',
+                     'web-security', 'file-access', 'ozone-conflict', 'ozone-duplicate',
+                     'touch-output', 'touch-matrix', 'touch-name', 'touch-url', 'touch-gles',
+                     'missing-wants', 'missing-conflicts', 'start-limit', 'restart-delay'):
             for artifact in ('rootfs', 'tar', 'ext4'):
                 with self.subTest(case=case, artifact=artifact), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory) / 'root'
@@ -317,6 +327,43 @@ class KioskAcceptanceTests(unittest.TestCase):
                         context.write_text(context.read_text() + 'Environment=LD_PRELOAD=/tmp/inject.so\n')
                     elif case == 'escaped-context':
                         context.write_text(context.read_text() + 'Environment=DD_KIOSK_GLES2_COMPAT=\\1\n')
+                    elif case.startswith('policy-'):
+                        policy = dict(VERIFY.CHROMIUM_POLICY)
+                        if case == 'policy-integer-bool':
+                            policy['PrintingEnabled'] = 0
+                        elif case == 'policy-bool-integer':
+                            policy['BrowserSignin'] = False
+                        elif case == 'policy-extra':
+                            policy['URLAllowlist'] = ['*']
+                        elif case == 'policy-list':
+                            policy = []
+                        elif case == 'policy-null':
+                            policy = None
+                        (checkout / 'etc/chromium/policies/managed/dd-kiosk-browser.json').write_text(json.dumps(policy))
+                    elif case in ('gpu-equals', 'no-sandbox', 'web-security', 'file-access', 'ozone-conflict', 'ozone-duplicate'):
+                        flag = {'gpu-equals': '--disable-gpu=true', 'no-sandbox': '--no-sandbox',
+                                'web-security': '--disable-web-security=1',
+                                'file-access': '--allow-file-access-from-files',
+                                'ozone-conflict': '--ozone-platform=x11',
+                                'ozone-duplicate': '--ozone-platform=wayland'}[case]
+                        launcher = checkout / 'usr/bin/dd-kiosk-browser'
+                        launcher.write_text(launcher.read_text().strip() + ' ' + flag + '\n')
+                    elif case.startswith('touch-'):
+                        if case in ('touch-url', 'touch-gles'):
+                            path = checkout / 'usr/bin/jaguar-touch-test'
+                            before, after = ('index.html', 'wrong.html') if case == 'touch-url' else ('COMPAT:-1', 'COMPAT:-0')
+                        else:
+                            path = checkout / VERIFY.JAGUAR_TOUCH_FILES[0].lstrip('/')
+                            before, after = {'touch-output': ('DSI-1', 'HDMI-A-1'),
+                                             'touch-matrix': ('1 0 0 0 1 0', '0 1 0 1 0 0'),
+                                             'touch-name': ('generic ft5x06*', 'wrong-touch*')}[case]
+                        path.write_text(path.read_text().replace(before, after))
+                    elif case in ('missing-wants', 'missing-conflicts', 'start-limit', 'restart-delay'):
+                        before, after = {'missing-wants': ('Wants=weston.service', '#Wants=weston.service'),
+                                         'missing-conflicts': ('Conflicts=screen-aero-demo.service screen-flutter-demo.service', '#Conflicts=screen-aero-demo.service screen-flutter-demo.service'),
+                                         'start-limit': ('StartLimitIntervalSec=0', 'StartLimitIntervalSec=10'),
+                                         'restart-delay': ('RestartSec=3', 'RestartSec=60')}[case]
+                        unit.write_text(unit.read_text().replace(before, after))
                     def check():
                         if artifact == 'rootfs':
                             with contextlib.redirect_stdout(io.StringIO()):
