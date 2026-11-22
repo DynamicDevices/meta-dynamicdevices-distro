@@ -36,12 +36,22 @@ DD_KIOSK_START_MUTED:imx8mm-jaguar-screen = "1"
 # The machine's ALSA recipe owns its default hardware routing configuration.
 RDEPENDS:${PN}:append:imx8mm-jaguar-screen = " alsa-state"
 
+def dd_kiosk_start_url_shell(d):
+    import shlex
+    url = d.getVar('DD_KIOSK_START_URL')
+    if not url or any(c in url for c in '\n\r\x00'):
+        raise ValueError('DD_KIOSK_START_URL must be a nonempty single-line URL')
+    # Quote for EnvironmentFile as well as the generated task's shell. This
+    # preserves apostrophes, quotes and backslashes in both consumers.
+    environment_url = '"' + url.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    return shlex.quote(environment_url)
+
 do_install() {
     install -d ${D}${bindir} ${D}${libexecdir} ${D}${systemd_system_unitdir} ${D}${systemd_system_unitdir}/weston.service.d ${D}${systemd_system_unitdir}/dd-kiosk-browser.service.d ${D}${sysconfdir}/default ${D}${datadir}/dd-kiosk-browser ${D}${sysconfdir}/NetworkManager/dispatcher.d ${D}${sysconfdir}/chromium/policies/managed
     install -m 0755 ${WORKDIR}/dd-kiosk-browser ${D}${bindir}/dd-kiosk-browser
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.service ${D}${systemd_system_unitdir}/dd-kiosk-browser.service
     install -m 0644 ${WORKDIR}/dd-kiosk-browser.env ${D}${sysconfdir}/default/dd-kiosk-browser
-    dd_kiosk_start_url=$(printf '%s' '${DD_KIOSK_START_URL}' | sed 's/[\\&|]/\\&/g')
+    dd_kiosk_start_url=$(printf '%s' ${@dd_kiosk_start_url_shell(d)} | sed 's/[\\&|]/\\&/g')
     sed -i "s|^DD_KIOSK_URL=.*|DD_KIOSK_URL=$dd_kiosk_start_url|" ${D}${sysconfdir}/default/dd-kiosk-browser
     sed -i 's/^DD_KIOSK_MUTE_AUDIO=.*/DD_KIOSK_MUTE_AUDIO=${DD_KIOSK_START_MUTED}/' ${D}${sysconfdir}/default/dd-kiosk-browser
     sed -i 's/^DD_KIOSK_GLES2_COMPAT=.*/DD_KIOSK_GLES2_COMPAT=${DD_KIOSK_GLES2_COMPAT}/' ${D}${sysconfdir}/default/dd-kiosk-browser

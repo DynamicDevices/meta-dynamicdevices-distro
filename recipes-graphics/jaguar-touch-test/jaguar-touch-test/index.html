@@ -131,6 +131,7 @@ const history = [];
 const counters = {touchstart:0,touchmove:0,touchend:0,touchcancel:0,
                   pointerdown:0,pointermove:0,pointerup:0,pointercancel:0};
 let width = 0, height = 0, maximum = 0, nativeSeen = false;
+let compatibilitySerial = 0;
 let mode = new URLSearchParams(location.search).get('mode') === 'gestures' ? 'gestures' : 'contacts';
 const trailVisibility = {contacts:true, gestures:false};
 const view = {scale:1, x:0, y:0};
@@ -156,10 +157,15 @@ function remember(point, down) {
     if (history.length > 5000) history.splice(0, history.length - 5000);
 }
 
+function activeContacts() {
+    if (touches.size) return touches;
+    return nativeSeen ? new Map(Array.from(pointers).filter(([,point]) => point.compatibilityId === undefined)) : pointers;
+}
+
 function updateGesture() {
     if (mode !== 'gestures') return;
-    const source = nativeSeen ? 'native' : 'pointer';
-    const active = nativeSeen ? touches : pointers;
+    const source = touches.size ? 'native' : 'pointer';
+    const active = activeContacts();
     const points = Array.from(active.entries()).sort((a,b)=>a[1].slot-b[1].slot).slice(0,2);
     if (!points.length) { gesture = null; return; }
     const first = points[0][1], second = points[1]?.[1];
@@ -179,7 +185,7 @@ function updateGesture() {
 }
 
 function render() {
-    const active = nativeSeen ? touches : pointers;
+    const active = activeContacts();
     maximum = Math.max(maximum, active.size);
     const needsCanvas = mode === 'contacts' || (trailVisibility[mode] && history.length > 0);
     renderMarkers(active, mode === 'gestures' && !needsCanvas);
@@ -260,6 +266,12 @@ function onTouch(event) {
         touches.has(contact.identifier) || !(contact.target || event.target).closest?.('button,nav'));
     if (!touches.size && !contacts.length) return;
     if (!event.target.closest?.('button,nav')) event.preventDefault();
+    if (!nativeSeen) {
+        const compatibilityIds = new Set(Array.from(pointers.values(), point => point.compatibilityId)
+            .filter(id => id !== undefined));
+        const retained = history.filter(point => !compatibilityIds.has(point.compatibilityId));
+        history.splice(0, history.length, ...retained);
+    }
     nativeSeen = true;
     counters[event.type]++;
     const next = new Map();
@@ -280,6 +292,7 @@ function onTouch(event) {
         last = event.type+' #'+(point.slot+1)+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
     }
     touches = next;
+    maximum = Math.max(maximum, touches.size);
     updateGesture();
     scheduleRender();
 }
@@ -289,16 +302,19 @@ function onPointer(event) {
     let point = pointers.get(event.pointerId);
     if (event.type === 'pointerdown') {
         point = newPoint(pointers);
+        if (event.pointerType === 'touch') point.compatibilityId = ++compatibilitySerial;
         pointers.set(event.pointerId, point);
+        maximum = Math.max(maximum, activeContacts().size);
     }
     if (point) {
         point.x = event.clientX; point.y = event.clientY;
-        if (!nativeSeen) remember(point, event.type === 'pointerdown');
+        const usable = !nativeSeen || point.compatibilityId === undefined;
+        if (usable) remember(point, event.type === 'pointerdown');
         if (event.type === 'pointerup' || event.type === 'pointercancel') pointers.delete(event.pointerId);
-        if (!nativeSeen) last = (event.pointerType||'pointer')+' '+event.type+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
+        if (usable) last = (event.pointerType||'pointer')+' '+event.type+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
     }
     // Do not cancel pointerdown: preserve Chromium's native touch event delivery.
-    if (!nativeSeen) updateGesture();
+    updateGesture();
     scheduleRender();
 }
 

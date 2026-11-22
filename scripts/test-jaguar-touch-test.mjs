@@ -181,7 +181,7 @@ for (const override of [undefined,'0','1']) {
         override ?? '1','file:///usr/share/jaguar-touch-test/index.html?mode=gestures','/usr/bin/dd-kiosk-browser']);
 }
 assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'), /d\.getVar\('DD_KIOSK_BROWSER_RUNTIME'\)/);
-assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'), /sed -i .*\$\{DD_KIOSK_TEST_BROWSER\}/);
+assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'), /sed -i \$\{@jaguar_browser_replacement\(d\)\}/);
 for (const provider of ['dd-kiosk-browser','alternate-kiosk']) {
     const installed = launcher.replaceAll('/usr/bin/dd-kiosk-browser', '/usr/bin/' + provider);
     for (const caller of [undefined, '/opt/custom-browser']) {

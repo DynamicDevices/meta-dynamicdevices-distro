@@ -38,8 +38,9 @@ compiler error.
 ## Next engineering focus
 
 1. Retain Clang only for the Chromium recipe and its recipe-local host tools.
-2. Inherit parallelism from the build configuration; do not force a
-   Chromium-specific job count. Worker CPU/memory admission is a separate setting.
+2. Retain the Chromium-specific `PARALLEL_MAKE = "-j 16"` memory bound for the
+   approximately 65-GiB, 44-CPU Foundries worker. CPU-count parallelism previously
+   exceeded this worker's memory capacity; changing the bound needs build evidence.
 3. Diagnose the Foundries command watchdog and maximum task/runtime behaviour.
 4. Improve Chromium sstate/cache reuse so unchanged compiler work is not lost.
 5. Re-run the exact Clang build once the worker/watchdog path is corrected.
