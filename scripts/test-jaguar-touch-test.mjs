@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {spawnSync} from 'node:child_process';
 
 const page = new URL('../recipes-graphics/jaguar-touch-test/jaguar-touch-test/index.html', import.meta.url);
 const script = fs.readFileSync(page, 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -164,3 +165,19 @@ const flutter = read('recipes-graphics/screen-flutter-demo/screen-flutter-demo_1
 assert.match(flutter,/jaguar-screen-touch/);
 assert.doesNotMatch(flutter,/file:\/\/99-jaguar-screen-touch.rules/);
 console.log('PASS: Jaguar image hooks, recipe payloads, shared identity policy, Flutter dependency');
+
+assert.match(read('recipes-graphics/jaguar-touch-test/jaguar-touch-test_1.0.bb'),
+    /RDEPENDS:\$\{PN\} = "packagegroup-dd-kiosk-browser"/);
+assert.match(read('recipes-core/packagegroups/packagegroup-dd-kiosk-browser.bb'),
+    /RDEPENDS:\$\{PN\} = "\$\{DD_KIOSK_BROWSER_RUNTIME\}"/);
+const launcher = read('recipes-graphics/jaguar-touch-test/jaguar-touch-test/jaguar-touch-test')
+    .replace('exec /usr/bin/dd-kiosk-browser', 'printf \'%s\\n%s\\n\' "$DD_KIOSK_GLES2_COMPAT" "$DD_KIOSK_URL"');
+for (const override of [undefined,'0','1']) {
+    const env = {PATH:process.env.PATH};
+    if (override !== undefined) env.DD_KIOSK_GLES2_COMPAT = override;
+    const result = spawnSync('sh',['-c',launcher,'jaguar-touch-test','--gestures'],{env,encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);
+    assert.deepEqual(result.stdout.trim().split('\n'),[
+        override ?? '1','file:///usr/share/jaguar-touch-test/index.html?mode=gestures']);
+}
+console.log('PASS: selected browser provider dependency, direct-launch GLES2 default and explicit overrides');

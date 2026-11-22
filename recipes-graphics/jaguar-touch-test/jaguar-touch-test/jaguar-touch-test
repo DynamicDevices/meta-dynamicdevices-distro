@@ -9,4 +9,7 @@ case "${1:-}" in
     *) echo "Usage: jaguar-touch-test [--gestures]" >&2; exit 2 ;;
 esac
 export DD_KIOSK_URL="file:///usr/share/jaguar-touch-test/index.html$suffix"
+# This package is Jaguar-only. Match the board's service default even when
+# launched directly, while retaining an explicit caller override.
+export DD_KIOSK_GLES2_COMPAT="${DD_KIOSK_GLES2_COMPAT:-1}"
 exec /usr/bin/dd-kiosk-browser

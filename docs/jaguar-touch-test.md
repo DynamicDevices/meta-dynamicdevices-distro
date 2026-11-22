@@ -80,7 +80,7 @@ Manual acceptance:
    do not establish ten physically verified contacts.
 
 Regression checks: `node scripts/test-jaguar-touch-test.mjs` and
-`python3 -m unittest discover -s scripts -p 'test_verify_kiosk_image.py'`.
+`node recipes-graphics/jaguar-touch-test/test-jaguar-touch-test.cjs`.
 Also build `jaguar-screen-touch jaguar-touch-test` in the actual Yocto workspace,
 check their inclusion in the resulting Jaguar image, and repeat physical tests.
 Local source and JS tests are not a built/released image or OTA acceptance.

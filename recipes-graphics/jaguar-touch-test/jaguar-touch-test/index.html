@@ -256,15 +256,18 @@ function render() {
 }
 
 function onTouch(event) {
-    if (!event.target.closest('button')) event.preventDefault();
+    const contacts = Array.from(event.touches).filter(contact =>
+        touches.has(contact.identifier) || !(contact.target || event.target).closest?.('button,nav'));
+    if (!touches.size && !contacts.length) return;
+    if (!event.target.closest?.('button,nav')) event.preventDefault();
     nativeSeen = true;
     counters[event.type]++;
     const next = new Map();
     // Rebuild from every event's complete contact set: no pointerdown prerequisite.
-    for (const contact of Array.from(event.touches)) {
+    for (const contact of contacts) {
         if (touches.has(contact.identifier)) next.set(contact.identifier, touches.get(contact.identifier));
     }
-    for (const contact of Array.from(event.touches)) {
+    for (const contact of contacts) {
         const point = next.get(contact.identifier) || newPoint(next);
         point.x = contact.clientX; point.y = contact.clientY;
         next.set(contact.identifier, point);
@@ -303,7 +306,8 @@ for (const type of ['touchstart','touchmove','touchend','touchcancel'])
     document.addEventListener(type, onTouch, {capture:true,passive:false});
 for (const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type, event => {
-        if (event.target.closest?.('button,nav')) return;
+        if (type === 'pointerdown' && event.target.closest?.('button,nav')) return;
+        if (type !== 'pointerdown' && !pointers.has(event.pointerId)) return;
         onPointer(event);
     }, {capture:true});
 

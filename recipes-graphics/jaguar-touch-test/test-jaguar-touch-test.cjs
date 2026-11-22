@@ -57,3 +57,31 @@ run(`onTouch({type:'touchcancel', target:{closest:()=>null}, preventDefault(){},
 assert.equal(run('touches.size'),0);
 assert.equal(element('#screen').style.display,'none');
 console.log('PASS: empty-view redraw, pointer fallback, native-touch pan/cancel, pinch, release, buttons, trails, modes, animation control');
+
+run('clear()');
+const control = {closest:()=>({})};
+const surface = {closest:()=>null};
+pointer('pointerdown',400,400,21);
+pointer('pointermove',500,450,21,control);
+assert.equal(run('pointers.size'),1,'tracked drag continues over navigation');
+pointer('pointerup',500,450,21,control);
+assert.equal(run('pointers.size'),0,'release over navigation clears tracked pointer');
+pointer('pointerdown',400,400,22);
+pointer('pointercancel',500,450,22,control);
+assert.equal(run('pointers.size'),0,'cancel over navigation clears tracked pointer');
+run('clear()');
+function native(type, target, contacts) {
+    listeners.get(type)({type,target,touches:contacts,changedTouches:contacts,preventDefault(){}});
+}
+const buttonTouch = {identifier:31,clientX:50,clientY:50,target:control};
+native('touchstart',control,[buttonTouch]);
+assert.equal(run('touches.size'),0,'button-only touch is not a test contact');
+assert.equal(run('nativeSeen'),false,'button-only touch must not disable pointer fallback');
+const testTouch = {identifier:32,clientX:500,clientY:400,target:surface};
+native('touchstart',surface,[testTouch]);
+native('touchstart',control,[testTouch,buttonTouch]);
+assert.equal(run('touches.size'),1,'control contact cannot join an existing gesture');
+assert.equal(run('touches.has(32)'),true,'existing surface contact is retained');
+native('touchend',surface,[]);
+assert.equal(run('touches.size'),0,'last surface release clears contacts');
+console.log('PASS: control-touch filtering, existing-contact retention, pointer move/release/cancel over navigation');

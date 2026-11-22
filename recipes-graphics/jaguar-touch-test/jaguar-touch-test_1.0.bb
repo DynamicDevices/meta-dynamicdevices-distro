@@ -6,7 +6,7 @@ LICENSE = "CLOSED"
 SRC_URI = "file://index.html file://jaguar-touch-test"
 S = "${WORKDIR}"
 
-RDEPENDS:${PN} = "${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-cog', 'dd-kiosk-cog', 'dd-kiosk-browser', d)}"
+RDEPENDS:${PN} = "packagegroup-dd-kiosk-browser"
 COMPATIBLE_MACHINE = "^imx8mm-jaguar-screen$"
 
 do_install() {
