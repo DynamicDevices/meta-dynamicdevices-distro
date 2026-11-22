@@ -3,6 +3,7 @@
 import os
 import importlib.util
 import re
+import shlex
 from pathlib import Path
 import socket
 import subprocess
@@ -144,26 +145,45 @@ class KioskStartupTests(unittest.TestCase):
         # Execute the real recipe's URL/mute/GLES2 rendering block, not a duplicate
         # Python implementation of sed's replacement/escaping behaviour.
         block = re.search(r'(?m)^    dd_kiosk_start_url=.*\n(?:    sed -i .*\n){3}', recipe)[0]
-        for machine in ('imx8mm-jaguar-screen', 'another-machine'):
+        helper = recipe[recipe.index('def dd_kiosk_start_url_shell(d):'):recipe.index('\ndo_install()')]
+        namespace = {}
+        exec(helper, namespace)
+        spec = importlib.util.spec_from_file_location('verify_kiosk_image', ROOT.parents[1] / 'scripts/verify-kiosk-image.py')
+        verifier = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verifier)
+        for machine, override_url in (
+                ('imx8mm-jaguar-screen', None), ('another-machine', None),
+                ('imx8mm-jaguar-screen', "https://example.com/it's?a=1&b=2"),
+                ('another-machine', "https://example.com/it's?literal=$(false)&q='"),
+                ('imx8mm-jaguar-screen', 'https://example.com/quote"?pipe=|&slash=\\')):
             def setting(name):
                 override = re.search(r'^' + name + ':' + machine + r' = "([^"]+)"', recipe, re.M)
                 return override[1] if override else re.search(r'^' + name + r' \?= "([^"]+)"', recipe, re.M)[1]
             url, mute = setting('DD_KIOSK_START_URL'), setting('DD_KIOSK_START_MUTED')
+            url = override_url or url
             gles2 = setting('DD_KIOSK_GLES2_COMPAT')
-            with self.subTest(machine=machine), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(machine=machine, url=url), tempfile.TemporaryDirectory() as directory:
                 installed = Path(directory) / 'etc/default/dd-kiosk-browser'
                 installed.parent.mkdir(parents=True)
                 installed.write_text((FILES / 'dd-kiosk-browser.env').read_text())
-                script = block.replace('${DD_KIOSK_START_URL}', url).replace('${DD_KIOSK_START_MUTED}', mute)
+                data = type('Data', (), {'getVar': lambda self, key: url})()
+                script = block.replace('${@dd_kiosk_start_url_shell(d)}', namespace['dd_kiosk_start_url_shell'](data))
+                script = script.replace('${DD_KIOSK_START_MUTED}', mute)
                 script = script.replace('${DD_KIOSK_GLES2_COMPAT}', gles2)
                 script = script.replace('${D}', directory).replace('${sysconfdir}', '/etc')
                 result = subprocess.run(['/bin/sh', '-ec', script], text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 environment = dict(line.split('=', 1) for line in installed.read_text().splitlines()
                                    if line and not line.startswith('#'))
+                environment['DD_KIOSK_URL'] = shlex.split(environment['DD_KIOSK_URL'])[0]
                 self.assertEqual(environment['DD_KIOSK_URL'], url)
                 self.assertEqual(environment['DD_KIOSK_MUTE_AUDIO'], mute)
                 self.assertEqual(environment['DD_KIOSK_GLES2_COMPAT'], gles2)
+                if machine == 'imx8mm-jaguar-screen':
+                    verifier.verify_startup_environment(installed.read_text(), url)
+                if override_url:
+                    self.assertEqual(environment['DD_KIOSK_URL'], override_url)
+                    continue
                 if machine == 'imx8mm-jaguar-screen':
                     self.assertIn('&loop=1&playlist=nfWlot6h_JM', url)
                     self.assertEqual(mute, '1')
@@ -171,6 +191,18 @@ class KioskStartupTests(unittest.TestCase):
                 else:
                     self.assertEqual((url, mute), ('https://active-esl.com', '0'))
                     self.assertEqual(gles2, '0')
+
+    def test_recipe_rejects_multiline_start_urls(self):
+        recipe = (ROOT / 'dd-kiosk-browser_1.0.bb').read_text()
+        helper = recipe[recipe.index('def dd_kiosk_start_url_shell(d):'):recipe.index('\ndo_install()')]
+        namespace = {}
+        exec(helper, namespace)
+        for url in ('', 'https://example.com/\nnext', 'https://example.com/\rnext',
+                    'https://example.com/\x00next'):
+            with self.subTest(url=url):
+                data = type('Data', (), {'getVar': lambda self, key: url})()
+                with self.assertRaisesRegex(ValueError, 'single-line URL'):
+                    namespace['dd_kiosk_start_url_shell'](data)
 
 
 if __name__ == "__main__":
