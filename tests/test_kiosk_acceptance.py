@@ -3,6 +3,7 @@ import importlib.util
 import gzip
 import contextlib
 import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -122,6 +123,126 @@ class KioskAcceptanceTests(unittest.TestCase):
                         else:
                             with self.assertRaises(ValueError):
                                 self.check_artifact(root, directory, artifact)
+
+    def test_tar_deployments_must_match_ext4_exactly(self):
+        for case in ('extra-stale', 'missing', 'duplicate', 'implicit-directories', 'serial-two'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / 'root'
+                for deployment in self.DEPLOYMENTS:
+                    self.make_deployment(root, deployment, 'regular')
+                if case == 'extra-stale':
+                    extra = 'ostree/deploy/other/deploy/stale.0'
+                    self.make_deployment(root, extra, 'regular')
+                    (root / extra / 'etc/default/dd-kiosk-browser').write_text(self.environment('https://stale.example.com'))
+                elif case == 'missing':
+                    shutil.rmtree(root / 'ostree/deploy/test/deploy/candidate.1')
+                elif case == 'serial-two':
+                    old = root / 'ostree/deploy/test/deploy/candidate.1'
+                    old.rename(old.with_name('candidate.2'))
+                if case == 'serial-two':
+                    # The ext4 enumerator must also see deployment serials beyond .1.
+                    original = self.DEPLOYMENTS
+                    self.DEPLOYMENTS = {x.replace('candidate.1', 'candidate.2') for x in original}
+                    try:
+                        self.assertEqual(self.check_artifact(root, directory, 'ext4'), self.DEPLOYMENTS)
+                        self.check_artifact(root, directory, 'tar')
+                    finally:
+                        self.DEPLOYMENTS = original
+                    continue
+                path = Path(directory) / 'ota.tar.xz'
+                with tarfile.open(path, 'w:xz') as archive:
+                    if case == 'implicit-directories':
+                        for file in root.rglob('*'):
+                            if file.is_file():
+                                archive.add(file, arcname=str(file.relative_to(root)))
+                    else:
+                        archive.add(root, arcname='.')
+                    if case == 'duplicate':
+                        name = 'ostree/deploy/test/deploy/good.0'
+                        archive.add(root / name, arcname=name, recursive=False)
+                if case == 'implicit-directories':
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        VERIFY.verify_ota_tar(path, self.DEPLOYMENTS)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'deployments differ|duplicate deployment'):
+                        VERIFY.verify_ota_tar(path, self.DEPLOYMENTS)
+
+    def test_rootfs_environment_links_are_contained(self):
+        for kind in ('absolute-escape', 'relative-escape', 'parent-escape',
+                     'absolute-internal', 'relative-internal'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / 'root'
+                config = root / 'etc/default/dd-kiosk-browser'
+                config.parent.mkdir(parents=True)
+                host = Path(directory) / 'host'
+                host.mkdir()
+                (host / config.name).write_text(self.environment())
+                if kind == 'parent-escape':
+                    config.parent.rmdir()
+                    config.parent.symlink_to(host)
+                elif kind.endswith('internal'):
+                    target = config.with_name('real-environment')
+                    target.write_text(self.environment())
+                    config.symlink_to('/etc/default/real-environment'
+                                      if kind == 'absolute-internal' else target.name)
+                else:
+                    target = host / config.name
+                    config.symlink_to(str(target) if kind == 'absolute-escape'
+                                      else os.path.relpath(target, config.parent))
+                if kind.endswith('internal'):
+                    VERIFY.verify_startup_url(root, VERIFY.JAGUAR_START_URL)
+                else:
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_startup_url(root, VERIFY.JAGUAR_START_URL)
+
+    def test_rootfs_reads_use_image_not_host_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'root'
+            self.make_deployment(root, '', 'regular')
+            files = {
+                'usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf': 'ExecStart=\nExecStart=/usr/libexec/dd-screen-weston --config=/etc/xdg/weston/weston-screen.ini\n',
+                'usr/libexec/dd-screen-weston': 'fixture',
+                'usr/lib/libweston-13/gl-renderer.so': 'fixture',
+                'usr/lib/libweston-13/kiosk-shell.so': 'fixture',
+                'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf': 'Environment=DD_KIOSK_GLES2_COMPAT=1',
+                'usr/lib/systemd/system/dd-kiosk-browser.service': 'User=weston\nStateDirectory=dd-kiosk-browser\nRestart=always\nAfter=weston.service\n',
+                'usr/bin/dd-kiosk-browser': '--ozone-platform=wayland --kiosk',
+                'usr/libexec/dd-kiosk-linker-guard': 'kiosk-audio-hotpatch.conf zz-audio-hotpatch.conf /sbin/ldconfig /ostree/deploy/',
+                'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf': 'UnsetEnvironment=LD_LIBRARY_PATH',
+                'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf': 'ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard',
+                'etc/xdg/weston/weston-screen.ini': 'shell=kiosk-shell.so\ntransform=rotate-90',
+                'etc/systemd/system/weston.service.d/screen.conf': '--config=/etc/xdg/weston/weston-screen.ini',
+                'etc/chromium/policies/managed/dd-kiosk-browser.json': json.dumps({
+                    'AllowFileSelectionDialogs': False, 'BrowserAddPersonEnabled': False,
+                    'BrowserGuestModeEnabled': False, 'BrowserSignin': 0,
+                    'DeveloperToolsAvailability': 2, 'DownloadRestrictions': 3,
+                    'ExtensionInstallBlocklist': ['*'], 'IncognitoModeAvailability': 1,
+                    'PrintingEnabled': False, 'URLBlocklist': ['view-source:*']}),
+            }
+            for name, content in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            (root / 'usr/libexec/dd-screen-weston').chmod(0o755)
+            enabled = root / 'etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
+            enabled.parent.mkdir(parents=True)
+            enabled.symlink_to('/usr/lib/systemd/system/dd-kiosk-browser.service')
+            with contextlib.redirect_stdout(io.StringIO()):
+                VERIFY.verify_rootfs(root)
+            for name, content in files.items():
+                with self.subTest(name=name):
+                    path = root / name
+                    mode = path.stat().st_mode
+                    host = Path(directory) / 'host-file'
+                    host.write_text(content)
+                    host.chmod(0o755)
+                    path.unlink()
+                    path.symlink_to(host)
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_rootfs(root)
+                    path.unlink()
+                    path.write_text(content)
+                    path.chmod(mode)
 
     def test_every_shipped_program_must_be_executable(self):
         for name in sorted(VERIFY.ARTIFACT_EXECUTABLES):

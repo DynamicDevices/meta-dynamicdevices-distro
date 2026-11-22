@@ -185,7 +185,7 @@ def verify_ota_ext4(path, expected_url=JAGUAR_START_URL):
         for osname in entries(image, '/ostree/deploy'):
             deploy_dir = f'/ostree/deploy/{osname}/deploy'
             for checkout in entries(image, deploy_dir):
-                if checkout.endswith(('.0', '.1')):
+                if re.fullmatch(r'.+\.\d+', checkout):
                     deployments.append(f'{deploy_dir}/{checkout}')
         if not deployments:
             raise ValueError('OTA ext4 has no OSTree deployment checkout')
@@ -200,18 +200,31 @@ def verify_ota_tar(path, deployments, expected_url=JAGUAR_START_URL):
     """Check the separate OTA tar ships the same named deployment payload."""
     metadata = {}
     members = {}
+    tar_deployments = set()
+    deployment_pattern = re.compile(r'^(ostree/deploy/[^/]+/deploy/[^/]+\.\d+)(?:/|$)')
     with tarfile.open(path, mode='r:xz') as archive:
         for member in archive:
-            name = member.name[2:] if member.name.startswith('./') else member.name
-            name = name.rstrip('/')
+            parts = pathlib.PurePosixPath(member.name)
+            if parts.is_absolute() or '..' in parts.parts:
+                raise ValueError(f'OTA tar contains an unsafe path: {member.name}')
+            name = str(parts)
             # Keep only deployment metadata; never extract untrusted archive paths.
-            if any(name.startswith(deployment + '/') for deployment in deployments):
+            match = deployment_pattern.match(name)
+            if match:
+                deployment = match[1]
+                tar_deployments.add(deployment)
+                if name == deployment and not member.isdir():
+                    raise ValueError(f'OTA tar deployment root is not a directory: {name}')
                 kind = ('regular' if member.isfile() else 'symlink' if member.issym()
                         else 'directory' if member.isdir() else 'other')
                 if name in metadata:
                     raise ValueError(f'OTA tar contains duplicate deployment path: {name}')
                 metadata[name] = (kind, member.mode, member.linkname)
                 members[name] = member
+        if not tar_deployments or tar_deployments != set(deployments):
+            raise ValueError(f'OTA tar deployments differ from ext4: '
+                             f'missing={sorted(set(deployments) - tar_deployments)}, '
+                             f'unexpected={sorted(tar_deployments - set(deployments))}')
         # Tar permits omitted directory headers; children imply those directories.
         for name in list(metadata):
             for parent in pathlib.PurePosixPath(name).parents:
@@ -221,7 +234,7 @@ def verify_ota_tar(path, deployments, expected_url=JAGUAR_START_URL):
             with archive.extractfile(members[name]) as contents:
                 return contents.read().decode('utf-8')
 
-        for deployment in deployments:
+        for deployment in tar_deployments:
             verify_artifact_payload(deployment, metadata.get, read, expected_url)
     print(f'OTA tar kiosk payload: verified in {len(deployments)} deployment(s) of {path}')
 
@@ -276,27 +289,31 @@ def verify_wic_partitions(wic_gz, ota_gz):
 
 def verify_etnaviv_weston(rootfs):
     """Reject stale G2D launchers and a missing GL runtime in the candidate."""
-    vendor = rootfs / 'usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf'
-    if not vendor.is_file():
-        raise ValueError('rootfs lacks deployment-owned Etnaviv Weston override')
+    try:
+        vendor = rootfs_file(rootfs, '/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf')
+    except ValueError as exc:
+        raise ValueError('rootfs lacks valid deployment-owned Etnaviv Weston override') from exc
     command = vendor.read_text()
     if '--use-g2d' in command or '--use-pixman' in command:
         raise ValueError('rootfs Etnaviv Weston override selects a non-GL renderer')
     if 'ExecStart=\n' not in command or '--config=/etc/xdg/weston/weston-screen.ini' not in command:
         raise ValueError('rootfs Etnaviv Weston override lacks command reset or screen config')
-    if not any(rootfs.glob('usr/lib*/libweston-*/gl-renderer.so')):
+    if not any(rootfs_file(rootfs, str(path.relative_to(rootfs)))
+               for path in rootfs.glob('usr/lib*/libweston-*/gl-renderer.so')):
         raise ValueError('rootfs Etnaviv Weston lacks gl-renderer.so')
-    selector = rootfs / 'usr/libexec/dd-screen-weston'
+    try:
+        rootfs_file(rootfs, '/usr/libexec/dd-screen-weston', executable=True)
+    except ValueError as exc:
+        raise ValueError('rootfs Etnaviv Weston lacks executable dynamic display selector') from exc
     if ('ExecStart=/usr/libexec/dd-screen-weston ' not in command or
-            '--drm-device=' in command or not selector.is_file() or
-            not selector.stat().st_mode & 0o111):
+            '--drm-device=' in command):
         raise ValueError('rootfs Etnaviv Weston lacks executable dynamic display selector')
     if any(rootfs.glob('usr/lib*/libweston-*/g2d-renderer.so')):
         raise ValueError('rootfs Etnaviv Weston includes the NXP G2D renderer')
 
 
 def verify_startup_url(rootfs, expected_url):
-    environment = (rootfs / 'etc/default/dd-kiosk-browser').read_text()
+    environment = rootfs_file(rootfs, '/etc/default/dd-kiosk-browser').read_text()
     verify_startup_environment(environment, expected_url)
 
 
@@ -318,7 +335,8 @@ def verify_startup_environment(environment, expected_url):
             raise ValueError(f'kiosk environment requires {key}={value}')
 
 
-def verify_jaguar_touch(rootfs):
+def rootfs_file(rootfs, name, executable=False):
+    """Return a real image file with image-rooted symlink semantics."""
     def entry(name):
         path = pathlib.Path(name)
         try:
@@ -329,10 +347,13 @@ def verify_jaguar_touch(rootfs):
                 else 'symlink' if stat.S_ISLNK(mode) else 'other')
         return kind, mode, str(path.readlink()) if kind == 'symlink' else None
 
+    return pathlib.Path(resolve_artifact_file(str(rootfs.resolve()), name, entry, executable))
+
+
+def verify_jaguar_touch(rootfs):
     for name in JAGUAR_TOUCH_FILES:
         try:
-            resolve_artifact_file(str(rootfs.resolve()), name, entry,
-                                  executable=name in ARTIFACT_EXECUTABLES)
+            rootfs_file(rootfs, name, executable=name in ARTIFACT_EXECUTABLES)
         except ValueError as exc:
             raise ValueError(f'rootfs missing Jaguar touch payload or invalid file: {name}: {exc}') from exc
 
@@ -340,8 +361,8 @@ def verify_jaguar_touch(rootfs):
 def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     verify_etnaviv_weston(rootfs)
     verify_jaguar_touch(rootfs)
-    context = rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf'
-    if not context.is_file() or 'Environment=DD_KIOSK_GLES2_COMPAT=1' not in context.read_text():
+    context = rootfs_file(rootfs, '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzzzz-screen-etnaviv-context.conf')
+    if 'Environment=DD_KIOSK_GLES2_COMPAT=1' not in context.read_text():
         raise ValueError('rootfs lacks Screen ES2 Chromium compatibility policy')
     required = (
         'usr/bin/chromium',
@@ -356,14 +377,19 @@ def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
         'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf',
         'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
     )
-    missing = [path for path in required if not (rootfs / path).is_file()]
-    if missing:
-        raise ValueError(f'rootfs missing files: {missing}')
+    for path in required:
+        rootfs_file(rootfs, path)
     unit_paths = (
-        rootfs / 'lib/systemd/system/dd-kiosk-browser.service',
-        rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service',
+        '/lib/systemd/system/dd-kiosk-browser.service',
+        '/usr/lib/systemd/system/dd-kiosk-browser.service',
     )
-    unit_path = next((path for path in unit_paths if path.is_file()), None)
+    unit_path = None
+    for path in unit_paths:
+        try:
+            unit_path = rootfs_file(rootfs, path)
+            break
+        except ValueError:
+            continue
     if unit_path is None:
         raise ValueError('rootfs lacks dd-kiosk-browser.service')
     service = unit_path.read_text()
@@ -374,35 +400,38 @@ def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     enabled = rootfs / 'etc/systemd/system/multi-user.target.wants/dd-kiosk-browser.service'
     if not enabled.is_symlink():
         raise ValueError('rootfs kiosk service is not enabled for startup')
-    launcher = (rootfs / 'usr/bin/dd-kiosk-browser').read_text()
+    if rootfs_file(rootfs, str(enabled.relative_to(rootfs))) != unit_path:
+        raise ValueError('rootfs enabled kiosk service does not resolve to its unit')
+    launcher = rootfs_file(rootfs, '/usr/bin/dd-kiosk-browser').read_text()
     for flag in ('--ozone-platform=wayland', '--kiosk'):
         if flag not in launcher:
             raise ValueError(f'rootfs kiosk launcher lacks required Chromium flag {flag}')
     if '--disable-gpu' in launcher:
         raise ValueError('rootfs kiosk launcher disables GPU acceleration')
-    linker_guard = (rootfs / 'usr/libexec/dd-kiosk-linker-guard').read_text()
+    linker_guard = rootfs_file(rootfs, '/usr/libexec/dd-kiosk-linker-guard').read_text()
     for contract in ('kiosk-audio-hotpatch.conf', 'zz-audio-hotpatch.conf',
                      '/sbin/ldconfig', '/ostree/deploy/'):
         if contract not in linker_guard:
             raise ValueError(f'rootfs linker guard lacks migration contract {contract}')
-    native_runtime = (rootfs / 'usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf').read_text()
+    native_runtime = rootfs_file(rootfs, '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf').read_text()
     if 'UnsetEnvironment=LD_LIBRARY_PATH' not in native_runtime:
         raise ValueError('rootfs kiosk runtime does not clear legacy library overrides')
-    weston_guard = (rootfs / 'usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf').read_text()
+    weston_guard = rootfs_file(rootfs, '/usr/lib/systemd/system/weston.service.d/zzzz-kiosk-linker-guard.conf').read_text()
     if 'ExecStartPre=+/usr/libexec/dd-kiosk-linker-guard' not in weston_guard:
         raise ValueError('rootfs Weston service does not gate mixed-deployment linkage')
     verify_startup_url(rootfs, expected_url)
-    weston = (rootfs / 'etc/xdg/weston/weston-screen.ini').read_text()
+    weston = rootfs_file(rootfs, '/etc/xdg/weston/weston-screen.ini').read_text()
     if 'shell=kiosk-shell.so' not in weston:
         raise ValueError('rootfs Weston config does not select kiosk shell')
     if 'transform=rotate-90' not in weston:
         raise ValueError('rootfs Weston config lacks candidate panel transform')
-    weston_service = (rootfs / 'etc/systemd/system/weston.service.d/screen.conf').read_text()
+    weston_service = rootfs_file(rootfs, '/etc/systemd/system/weston.service.d/screen.conf').read_text()
     if '--config=/etc/xdg/weston/weston-screen.ini' not in weston_service:
         raise ValueError('rootfs Weston service does not select candidate screen config')
-    if not any(path.is_file() for path in rootfs.rglob('kiosk-shell.so')):
+    if not any(rootfs_file(rootfs, str(path.relative_to(rootfs)))
+               for path in rootfs.rglob('kiosk-shell.so')):
         raise ValueError('rootfs lacks Weston kiosk-shell.so module')
-    policy_path = rootfs / 'etc/chromium/policies/managed/dd-kiosk-browser.json'
+    policy_path = rootfs_file(rootfs, '/etc/chromium/policies/managed/dd-kiosk-browser.json')
     policy = json.loads(policy_path.read_text())
     expected_policy = {
         'AllowFileSelectionDialogs': False,
@@ -419,10 +448,8 @@ def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
     for name, value in expected_policy.items():
         if policy.get(name) != value:
             raise ValueError(f'rootfs Chromium policy {name} does not match kiosk contract')
-    for executable in ('usr/bin/chromium', 'usr/bin/dd-kiosk-browser',
-                       'etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser'):
-        if not (rootfs / executable).stat().st_mode & 0o111:
-            raise ValueError(f'rootfs file is not executable: {executable}')
+    for executable in ARTIFACT_EXECUTABLES:
+        rootfs_file(rootfs, executable, executable=True)
     print(f'rootfs payload and kiosk service: verified at {rootfs}')
 
 

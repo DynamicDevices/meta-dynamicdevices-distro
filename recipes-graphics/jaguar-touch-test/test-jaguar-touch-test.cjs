@@ -85,3 +85,26 @@ assert.equal(run('touches.has(32)'),true,'existing surface contact is retained')
 native('touchend',surface,[]);
 assert.equal(run('touches.size'),0,'last surface release clears contacts');
 console.log('PASS: control-touch filtering, existing-contact retention, pointer move/release/cancel over navigation');
+
+// Browser animation frames are queued: a whole contact can happen before one draw.
+const frames = [];
+sandbox.requestAnimationFrame = callback => frames.push(callback);
+run('clear()');
+pointer('pointerdown',400,400,41);
+pointer('pointerdown',500,400,42);
+pointer('pointerup',400,400,41);
+pointer('pointerup',500,400,42);
+assert.equal(run('pointers.size'),0);
+assert.equal(run('maximum'),2,'pointer peak survives down/up before rendering');
+assert.equal(frames.length,1,'contact updates coalesce into one frame');
+while (frames.length) frames.shift()();
+assert.equal(run('maximum'),2);
+run('clear()');
+native('touchstart',surface,[testTouch, {...testTouch,identifier:33}]);
+native('touchend',surface,[]);
+assert.equal(run('touches.size'),0);
+assert.equal(run('maximum'),2,'native peak survives start/end before rendering');
+assert.equal(frames.length,1);
+while (frames.length) frames.shift()();
+assert.equal(run('maximum'),2);
+console.log('PASS: native and pointer contact peaks survive queued animation frames');

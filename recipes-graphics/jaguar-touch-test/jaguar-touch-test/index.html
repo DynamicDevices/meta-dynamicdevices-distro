@@ -280,6 +280,7 @@ function onTouch(event) {
         last = event.type+' #'+(point.slot+1)+' · x='+Math.round(point.x)+' y='+Math.round(point.y);
     }
     touches = next;
+    maximum = Math.max(maximum, touches.size);
     updateGesture();
     scheduleRender();
 }
@@ -290,6 +291,7 @@ function onPointer(event) {
     if (event.type === 'pointerdown') {
         point = newPoint(pointers);
         pointers.set(event.pointerId, point);
+        if (!nativeSeen) maximum = Math.max(maximum, pointers.size);
     }
     if (point) {
         point.x = event.clientX; point.y = event.clientY;
