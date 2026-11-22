@@ -3,6 +3,7 @@ import importlib.util
 import gzip
 import contextlib
 import io
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -31,6 +32,7 @@ class KioskAcceptanceTests(unittest.TestCase):
             path = checkout / name.lstrip('/')
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('fixture')
+            path.chmod(0o755 if name in VERIFY.ARTIFACT_EXECUTABLES else 0o644)
         (checkout / 'etc/default/dd-kiosk-browser').write_text(self.environment())
         launcher = checkout / 'usr/bin/jaguar-touch-test'
         launcher.chmod(0o755)
@@ -121,6 +123,61 @@ class KioskAcceptanceTests(unittest.TestCase):
                             with self.assertRaises(ValueError):
                                 self.check_artifact(root, directory, artifact)
 
+    def test_every_shipped_program_must_be_executable(self):
+        for name in sorted(VERIFY.ARTIFACT_EXECUTABLES):
+            for symlink in (False, True):
+                for artifact in ('tar', 'ext4'):
+                    with self.subTest(name=name, symlink=symlink, artifact=artifact), tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory) / 'root'
+                        for deployment in self.DEPLOYMENTS:
+                            self.make_deployment(root, deployment, 'regular')
+                        path = root / 'ostree/deploy/test/deploy/candidate.1' / name.lstrip('/')
+                        path.chmod(0o644)
+                        if symlink:
+                            path.rename(path.with_name('not-executable'))
+                            path.symlink_to('not-executable')
+                        with self.assertRaisesRegex(ValueError, 'regular executable'):
+                            self.check_artifact(root, directory, artifact)
+
+    def test_rootfs_touch_symlinks_stay_inside_rootfs(self):
+        for name in VERIFY.JAGUAR_TOUCH_FILES:
+            for kind in ('absolute-escape', 'relative-escape', 'absolute-internal',
+                         'relative-internal', 'cycle', 'parent-escape'):
+                with self.subTest(name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory) / 'root'
+                    outside = Path(directory) / 'host-payload'
+                    outside.write_text('host fixture must never satisfy rootfs checks')
+                    outside.chmod(0o755)
+                    for payload in VERIFY.JAGUAR_TOUCH_FILES:
+                        path = root / payload.lstrip('/')
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text('fixture')
+                        path.chmod(0o755)
+                    path = root / name.lstrip('/')
+                    path.unlink()
+                    if kind == 'parent-escape':
+                        host = Path(directory) / 'host-directory'
+                        host.mkdir()
+                        (host / path.name).write_text('fixture')
+                        (host / path.name).chmod(0o755)
+                        path.parent.rmdir()
+                        path.parent.symlink_to(host)
+                    elif kind.endswith('internal'):
+                        target = path.with_name('real-payload')
+                        target.write_text('fixture')
+                        target.chmod(0o755)
+                        path.symlink_to('/' + str(target.relative_to(root))
+                                        if kind == 'absolute-internal' else target.name)
+                    else:
+                        path.symlink_to(str(outside) if kind == 'absolute-escape' else
+                                        os.path.relpath(outside, path.parent) if kind == 'relative-escape'
+                                        else path.name)
+                    if kind.endswith('internal'):
+                        VERIFY.verify_jaguar_touch(root)
+                    else:
+                        with self.assertRaises(ValueError):
+                            VERIFY.verify_jaguar_touch(root)
+
     def test_shipped_environment_content_in_every_deployment(self):
         custom = 'https://example.com/start?a=1&b=2'
         cases = {
@@ -183,7 +240,7 @@ class KioskAcceptanceTests(unittest.TestCase):
                 path = root / name.lstrip('/')
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('fixture')
-            with self.assertRaisesRegex(ValueError, 'not executable'):
+            with self.assertRaisesRegex(ValueError, 'regular executable'):
                 VERIFY.verify_jaguar_touch(root)
             (root / 'usr/bin/jaguar-touch-test').chmod(0o755)
             VERIFY.verify_jaguar_touch(root)

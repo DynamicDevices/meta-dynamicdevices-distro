@@ -9,6 +9,7 @@ import pathlib
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -43,6 +44,13 @@ ARTIFACT_FILES = JAGUAR_TOUCH_FILES + (
     '/usr/lib/systemd/system/weston.service.d/zzzzzz-screen-etnaviv.conf',
     '/usr/lib/systemd/system/dd-kiosk-browser.service.d/zzzz-native-runtime.conf',
 )
+ARTIFACT_EXECUTABLES = {
+    '/usr/bin/jaguar-touch-test',
+    '/usr/bin/chromium',
+    '/usr/bin/dd-kiosk-browser',
+    '/usr/libexec/dd-kiosk-linker-guard',
+    '/etc/NetworkManager/dispatcher.d/90-dd-kiosk-browser',
+}
 
 
 def packages(path):
@@ -113,7 +121,7 @@ def verify_artifact_payload(deployment, entry, read, expected_url):
     resolved = {}
     for name in ARTIFACT_FILES:
         resolved[name] = resolve_artifact_file(
-            deployment, name, entry, executable=name == '/usr/bin/jaguar-touch-test')
+            deployment, name, entry, executable=name in ARTIFACT_EXECUTABLES)
     units = ('/usr/lib/systemd/system/dd-kiosk-browser.service',
              '/lib/systemd/system/dd-kiosk-browser.service')
     for unit in units:
@@ -311,12 +319,22 @@ def verify_startup_environment(environment, expected_url):
 
 
 def verify_jaguar_touch(rootfs):
-    missing = [name for name in JAGUAR_TOUCH_FILES
-               if not (rootfs / name.lstrip('/')).is_file()]
-    if missing:
-        raise ValueError(f'rootfs missing Jaguar touch payload: {missing}')
-    if not (rootfs / 'usr/bin/jaguar-touch-test').stat().st_mode & 0o111:
-        raise ValueError('rootfs Jaguar touch launcher is not executable')
+    def entry(name):
+        path = pathlib.Path(name)
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError:
+            return None
+        kind = ('regular' if stat.S_ISREG(mode) else 'directory' if stat.S_ISDIR(mode)
+                else 'symlink' if stat.S_ISLNK(mode) else 'other')
+        return kind, mode, str(path.readlink()) if kind == 'symlink' else None
+
+    for name in JAGUAR_TOUCH_FILES:
+        try:
+            resolve_artifact_file(str(rootfs.resolve()), name, entry,
+                                  executable=name in ARTIFACT_EXECUTABLES)
+        except ValueError as exc:
+            raise ValueError(f'rootfs missing Jaguar touch payload or invalid file: {name}: {exc}') from exc
 
 
 def verify_rootfs(rootfs, expected_url=JAGUAR_START_URL):
