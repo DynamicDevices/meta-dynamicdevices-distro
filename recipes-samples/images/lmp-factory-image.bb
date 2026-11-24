@@ -39,6 +39,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/imag
 # Enable Godot related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
 
+# Optional native Qt Widgets/Wayland runtime; no application payload.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'qt6', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
+
 # Enable the browser kiosk only for products that select it.
 require ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'recipes-samples/images/lmp-feature-kiosk-browser.inc', '', d)}
 
