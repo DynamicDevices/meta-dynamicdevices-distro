@@ -57,7 +57,8 @@ This layer provides distribution configurations that extend the standard Linux m
 - **Platform-specific optimizations** - Audio, connectivity, and power management features
 - **Commercial license support** - For proprietary components and applications
 - **Composable product software** - Headless by default, with explicit Flutter,
-  display, audio and Android-container feature bundles
+  display, audio, [Qt6 Widgets/Wayland](docs/qt6-wayland-runtime.md) and
+  Android-container feature bundles
 
 ## Documentation & Support
 

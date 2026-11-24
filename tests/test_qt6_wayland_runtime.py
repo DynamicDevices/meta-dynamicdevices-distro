@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from test_optional_godot_layer import registered_files
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -87,6 +89,14 @@ class QtRuntimeTest(unittest.TestCase):
         self.assertIn(" gui widgets dbus fontconfig", append)
         distro = (ROOT / "conf/distro/lmp-dynamicdevices.conf").read_text()
         self.assertNotRegex(distro, r'GCCVERSION\s*=\s*"14')
+
+    def test_optional_qt_layer_registration(self):
+        append = ROOT / "dynamic-layers/qt6-layer/recipes-qt/qt6/qtbase_%.bbappend"
+        self.assertTrue(append.is_file())
+        without = registered_files(set())
+        self.assertNotIn(append, without)
+        self.assertEqual(registered_files({"qt6-layer"}) - without, {append})
+        self.assertEqual(registered_files({"unrelated-layer"}), without)
 
 
 if __name__ == "__main__":

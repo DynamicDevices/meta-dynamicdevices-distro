@@ -12,6 +12,15 @@ application, replace the browser or change the system compiler/runtime.
 It may coexist with kiosk-browser libraries; the display-session owner must
 coordinate which application actually runs.
 
+The runtime packagegroup uses `TUNE_PKGARCH`, not `all`, because ALSA,
+fontconfig and UUID have architecture-dependent Debian package names. Assign
+`PACKAGE_ARCH` **before** inheriting `packagegroup`: the class immediately
+snapshots it into `PACKAGE_ARCH_EXPANDED`, which selects conditional `allarch`
+inheritance. Assigning it afterwards is too late for that decision. This is
+confirmed by the [OpenEmbedded class used by the LmP baseline](https://github.com/lmp-mirrors/openembedded-core/blob/7a59dc5ee6edd9596e87c2fbcd1f2594c06b3d1b/meta/classes-recipe/packagegroup.bbclass#L15-L26).
+The source regression checks ordering; only the remote build validates actual
+BitBake inheritance and dependency-name resolution.
+
 Applications are deployed separately and may remain in a writable home directory.
 Do not add vendor payloads, application-specific launchers or private compatibility
 libraries to this packagegroup. Any compatibility runtime must remain scoped to
