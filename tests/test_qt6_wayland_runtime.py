@@ -54,6 +54,13 @@ class QtRuntimeTest(unittest.TestCase):
         self.assertTrue({"qtbase", "qtbase-plugins", "qtwayland", "qtwayland-plugins", "alsa-lib", "util-linux-libuuid", "fontconfig", "liberation-fonts"}.issubset(packages))
         self.assertIn('LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"', group)
 
+    def test_packagegroup_architecture_precedes_inheritance(self):
+        group = (ROOT / "recipes-core/packagegroups/packagegroup-dd-qt6-wayland.bb").read_text()
+        architecture = 'PACKAGE_ARCH = "${TUNE_PKGARCH}"'
+        self.assertIn(architecture, group)
+        self.assertLess(group.index(architecture), group.index("inherit packagegroup"))
+        self.assertNotRegex(group, r"(?m)^inherit\s+.*\ballarch\b")
+
     def test_qt_rootfs_feature_guard_without_requiring_splash(self):
         image = (ROOT / "recipes-samples/images/lmp-factory-image.bb").read_text()
         body = textwrap.dedent(re.search(r'python do_rootfs:append\(\) \{\n(.*?)\n\}', image, re.S).group(1))
