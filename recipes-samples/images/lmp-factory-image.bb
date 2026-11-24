@@ -113,6 +113,12 @@ python do_rootfs:append() {
         if missing:
             bb.fatal('Selected display product is missing distro features: %s (DISTRO=%s)' %
                      (' '.join(sorted(missing)), d.getVar('DISTRO')))
+    if 'qt6' in selected:
+        required = {'display-runtime', 'qt6', 'wayland', 'opengl', 'alsa'}
+        missing = required - features
+        if missing:
+            bb.fatal('Selected Qt product is missing distro features: %s (DISTRO=%s)' %
+                     (' '.join(sorted(missing)), d.getVar('DISTRO')))
     if 'display-boot-splash' in features:
         root = Path(d.getVar('IMAGE_ROOTFS'))
         def image_file(name):

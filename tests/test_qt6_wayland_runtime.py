@@ -1,6 +1,7 @@
 """Source checks only; BitBake/image acceptance belongs on the remote builder."""
 
 import re
+import textwrap
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,6 +41,25 @@ class QtRuntimeTest(unittest.TestCase):
         group = (ROOT / "recipes-core/packagegroups/packagegroup-dd-qt6-wayland.bb").read_text()
         packages = re.search(r'RDEPENDS:\$\{PN\} = "(.*?)"', group, re.S).group(1).split()
         self.assertTrue({"qtbase", "qtbase-plugins", "qtwayland", "qtwayland-plugins", "alsa-lib", "util-linux-libuuid", "fontconfig", "liberation-fonts"}.issubset(packages))
+        self.assertIn('LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"', group)
+
+    def test_qt_rootfs_feature_guard_without_requiring_splash(self):
+        image = (ROOT / "recipes-samples/images/lmp-factory-image.bb").read_text()
+        body = textwrap.dedent(re.search(r'python do_rootfs:append\(\) \{\n(.*?)\n\}', image, re.S).group(1))
+        required = {"display-runtime", "qt6", "wayland", "opengl", "alsa"}
+
+        def check(features):
+            values = {"DD_PRODUCT_FEATURES": "qt6", "DISTRO_FEATURES": " ".join(features), "DISTRO": "test"}
+            def fatal(message):
+                raise ValueError(message)
+            exec(body, {"d": SimpleNamespace(getVar=values.get), "bb": SimpleNamespace(fatal=fatal)})
+
+        check(required)
+        for missing in required:
+            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, "Selected Qt product is missing"):
+                check(required - {missing})
+        with self.assertRaisesRegex(ValueError, "Selected Qt product is missing"):
+            check(set())
 
     def test_conditional_append_and_no_application_runtime(self):
         layer = (ROOT / "conf/layer.conf").read_text()
