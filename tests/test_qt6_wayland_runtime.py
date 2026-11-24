@@ -35,6 +35,17 @@ class QtRuntimeTest(unittest.TestCase):
         guard = re.search(r"display_software = selected & (\{[^}]+\})", self.features)
         self.assertIn("qt6", eval(guard.group(1)))
 
+    def test_qt_feature_selection_does_not_enable_boot_splash(self):
+        expression = next(expr for expr in re.findall(r"\$\{@(.*)\}", self.features)
+                          if expr.startswith("'display-boot-splash' if"))
+        cases = [("qt6", "1", ""), ("qt6", "0", ""),
+                 ("display qt6", "1", "display-boot-splash"),
+                 ("display qt6", "0", "")]
+        for selected, enabled, expected in cases:
+            with self.subTest(selected=selected, enabled=enabled):
+                values = {"DD_PRODUCT_FEATURES": selected, "DD_DISPLAY_BOOT_SPLASH": enabled}
+                self.assertEqual(eval(expression, {"d": SimpleNamespace(getVar=values.get)}), expected)
+
     def test_image_and_runtime_packages(self):
         image = (ROOT / "recipes-samples/images/lmp-factory-image.bb").read_text()
         self.assertIn("contains('DISTRO_FEATURES', 'qt6', 'recipes-samples/images/lmp-feature-qt.inc', '', d)", image)
