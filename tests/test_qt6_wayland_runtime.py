@@ -13,7 +13,9 @@ class QtRuntimeTest(unittest.TestCase):
         self.features = (ROOT / "conf/distro/include/lmp-dynamicdevices-product-features.inc").read_text()
 
     def test_opt_in_feature_expansion(self):
-        self.assertIn('DD_PRODUCT_FEATURES ?= ""', self.features)
+        default = re.search(r'^DD_PRODUCT_FEATURES \?= "(.*)"$', self.features, re.M)
+        self.assertIsNotNone(default)
+        self.assertNotIn("qt6", default.group(1))
         valid = re.search(r'DD_PRODUCT_FEATURES_VALID = "(.*?)"', self.features, re.S)
         self.assertIn("qt6", valid.group(1).split())
         expansion = re.search(r"contains\('DD_PRODUCT_FEATURES', 'qt6', '([^']+)'", self.features)

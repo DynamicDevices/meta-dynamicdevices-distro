@@ -3,7 +3,8 @@
 Select `qt6` in `DD_PRODUCT_FEATURES` to install Qt Core/GUI/Widgets/DBus,
 Wayland client plugins, ALSA, UUID and fonts. This expands the common
 Wayland/OpenGL features globally so Qt's native tools see the same configuration.
-The machine must provide `display-multimedia`. Headless products remain opt-out.
+The machine must provide `display-multimedia`. Qt remains opt-in regardless of
+the machine's existing headed/headless default.
 
 The manifest's shared Qt baseline is meta-qt6 v6.8.2,
 `f1563781215bae1e8099637dc18e20601f5c1071`. This feature does not start an
