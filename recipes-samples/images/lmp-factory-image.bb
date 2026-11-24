@@ -39,6 +39,9 @@ require ${@bb.utils.contains('DISTRO_FEATURES', 'flutter', 'recipes-samples/imag
 # Enable Godot related recipes if required by DISTRO
 require ${@bb.utils.contains('DISTRO_FEATURES', 'godot', 'recipes-samples/images/lmp-feature-godot.inc', '', d)}
 
+# Optional native Qt Widgets/Wayland runtime; no application payload.
+require ${@bb.utils.contains('DISTRO_FEATURES', 'qt6', 'recipes-samples/images/lmp-feature-qt.inc', '', d)}
+
 # Enable the browser kiosk only for products that select it.
 require ${@bb.utils.contains('DISTRO_FEATURES', 'kiosk-browser', 'recipes-samples/images/lmp-feature-kiosk-browser.inc', '', d)}
 
@@ -109,6 +112,12 @@ python do_rootfs:append() {
         missing = required - features
         if missing:
             bb.fatal('Selected display product is missing distro features: %s (DISTRO=%s)' %
+                     (' '.join(sorted(missing)), d.getVar('DISTRO')))
+    if 'qt6' in selected:
+        required = {'display-runtime', 'qt6', 'wayland', 'opengl', 'alsa'}
+        missing = required - features
+        if missing:
+            bb.fatal('Selected Qt product is missing distro features: %s (DISTRO=%s)' %
                      (' '.join(sorted(missing)), d.getVar('DISTRO')))
     if 'display-boot-splash' in features:
         root = Path(d.getVar('IMAGE_ROOTFS'))

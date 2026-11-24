@@ -16,7 +16,7 @@ empty product feature set opts out of the display stack. `headless` is not
 itself a feature.
 
 Without a selected bundle, the canonical distro removes graphical and host-audio features.
-Selecting `display`, `flutter`, `kiosk-browser`, `audio`, or `android-container` retains and
+Selecting `display`, `flutter`, `qt6`, `kiosk-browser`, `audio`, or `android-container` retains and
 expands the corresponding runtime. CRA audit and automatic registration remain
 global shipped-product policy rather than product options.
 
@@ -86,7 +86,7 @@ addition because the current Waydroid recipe declares it in
 configuration must use the stable
 `android-container` name rather than the provider name `waydroid`.
 
-The `display`, `flutter`, `godot`, and `kiosk-browser` selections require the BSP to declare
+The `display`, `flutter`, `godot`, `qt6`, and `kiosk-browser` selections require the BSP to declare
 `display-multimedia` in `MACHINE_FEATURES`. This keeps panel/GPU capability in
 the machine while preventing capable hardware from implicitly installing a UI.
 
@@ -95,6 +95,7 @@ Runtime payloads are owned by provider-neutral packagegroups:
 - `packagegroup-dd-alsa`
 - `packagegroup-dd-audio`
 - `packagegroup-dd-flutter`
+- `packagegroup-dd-qt6-wayland`
 - `packagegroup-dd-kiosk-browser`
 - `packagegroup-dd-android-container`
 
@@ -111,9 +112,13 @@ The legacy `lmp-feature-*.inc` image hooks now select these packagegroups so
 existing products retain their package payload while factory configuration is
 migrated. Wayland remains provided by the upstream LmP Wayland feature hook.
 
-Unknown feature names are fatal at parse time. Display, Flutter and Godot
+Unknown feature names are fatal at parse time. Display, Flutter, Godot and Qt6
 selection is also fatal unless the machine declares `display-multimedia`;
 recipe `COMPATIBLE_MACHINE` checks remain the final provider-level guard.
+
+The Qt6 selection provides native Widgets and Wayland client plugins, not an
+application or launcher. Its image acceptance check requires `display-runtime`,
+`qt6`, `wayland`, `opengl`, and `alsa`, without requiring a boot splash.
 
 `imx8mm-jaguar-screen` intentionally has no `improv` feature: the product has
 no working Bluetooth onboarding path. Do not infer onboarding protocols from

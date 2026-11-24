@@ -58,6 +58,7 @@ DD_PRODUCT_FEATURES_VALID = " \
     flutter \
     godot \
     improv \
+    qt6 \
     usb-gadget \
     wayland \
 "
@@ -68,9 +69,9 @@ DD_PRODUCT_FEATURES_VALID = " \
 DISTRO_FEATURES:remove = " \
     zeroconf x11 directfb \
     ${@'' if 'android-container' in set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) else 'vulkan'} \
-    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'android-container', 'kiosk-browser'} else 'wayland opengl'} \
+    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'display', 'wayland', 'flutter', 'godot', 'qt6', 'android-container', 'kiosk-browser'} else 'wayland opengl'} \
     ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'audio', 'android-container'} else 'pulseaudio'} \
-    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'android-container'} else 'alsa'} \
+    ${@'' if set((d.getVar('DD_PRODUCT_FEATURES') or '').split()) & {'alsa', 'audio', 'godot', 'qt6', 'android-container'} else 'alsa'} \
 "
 
 # Product-facing features expand to their complete runtime prerequisites.
@@ -84,6 +85,7 @@ DISTRO_FEATURES:append = " \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'wayland', 'wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'flutter', 'display-runtime flutter wayland opengl', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'godot', 'display-runtime godot wayland opengl alsa', '', d)} \
+    ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'qt6', 'display-runtime qt6 wayland opengl alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'kiosk-browser', 'display-runtime kiosk-browser wayland opengl etnaviv', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'android-container', 'waydroid apparmor wayland opengl vulkan pulseaudio alsa', '', d)} \
     ${@bb.utils.contains('DD_PRODUCT_FEATURES', 'auto-register', 'auto-register', '', d)} \
@@ -116,7 +118,7 @@ python dd_validate_product_features() {
             % " ".join(sorted(other_display_apps))
         )
 
-    display_software = selected & {"display", "flutter", "godot", "kiosk-browser"}
+    display_software = selected & {"display", "flutter", "godot", "qt6", "kiosk-browser"}
     machine_features = set((e.data.getVar("MACHINE_FEATURES") or "").split())
     if display_software and "display-multimedia" not in machine_features:
         bb.fatal(
